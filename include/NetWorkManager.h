@@ -2,6 +2,8 @@
 #define NET_MANAGE_H
 #include "secrets.h"
 #include <Arduino.h>
+#include "ArduinoJson.h"
+
 #ifndef ESP
 #define ESP
 #include <ESP8266WiFi.h>
@@ -18,13 +20,15 @@ public:
     ESP8266WiFiMulti wifi;
     NetWorkManager();
     bool setup();
-    String makePostReq(String url);
+    String makePostReq(String url, String JsonString);
     String makeGetReq(String url);
-    void test();
+    bool checkInternetConnectivity();
     void fetchExp();
+    bool sendMeasurement(u_int8_t channelNo, String measurement);
     WiFiClient client;
     HTTPClient http;
     String base = API_Base;
+    String testId;
 };
 
 #endif
