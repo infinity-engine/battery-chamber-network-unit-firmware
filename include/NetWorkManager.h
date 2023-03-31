@@ -3,6 +3,7 @@
 #include "secrets.h"
 #include <Arduino.h>
 #include "ArduinoJson.h"
+#include "functionPrototype.h"
 
 #ifndef ESP
 #define ESP
@@ -20,11 +21,16 @@ public:
     ESP8266WiFiMulti wifi;
     NetWorkManager();
     bool setup();
-    String makePostReq(String url, String JsonString);
+    String makePostReq(String url, String jsonString);
     String makeGetReq(String url);
     bool checkInternetConnectivity();
     void fetchExp();
     bool sendMeasurement(u_int8_t channelNo, String measurement);
+    bool setStatus(String status, u_int8_t channelNo = 0, u_int8_t rowNo = 0);
+    bool resolveResponse(String response);
+    bool incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo = 0);
+    String getDriveCycle(u_int8_t channelNo, u_int8_t rowNo);
+    String updatedUpto(u_int8_t channelNo);
     WiFiClient client;
     HTTPClient http;
     String base = API_Base;
