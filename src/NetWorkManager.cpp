@@ -76,11 +76,17 @@ String NetWorkManager::makeGetReq(String url)
     return response;
 }
 
-void NetWorkManager::fetchExp()
+/**
+ * @brief Fetch Experiment from cloud, which has status "Scheduled"
+ * the cloud will sort all the experiment accroding to scheduled date and return
+ * the experiment which has earliest date
+ * @return EXP_CONFIG|"null"
+ */
+String NetWorkManager::fetchExp()
 {
     const char *base = API_Base;
     String url = String(base) + "is-any-experiment?apiKey=" + API_Key;
-    Serial.println(makeGetReq(url));
+    return makeGetReq(url);
 }
 
 bool NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)

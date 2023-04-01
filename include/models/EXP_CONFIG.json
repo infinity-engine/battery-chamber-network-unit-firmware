@@ -1,0 +1,114 @@
+{
+    "channels": [
+        {
+            "info": {
+                "channelNumber": 1,
+                "testId": "64252acf428a0869f9a3c7e8_1",
+                "overallMultiplier": 1,
+                "isConAmTe": true,
+                "ambTemp": 25,
+                "noOfSubExp": 3
+            },
+            "steps": [
+                {
+                    "mode": 1,
+                    "currentRate": null,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": 36000,
+                    "voltLimit": null,
+                    "total_n_samples": null,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                },
+                {
+                    "mode": 2,
+                    "currentRate": 2,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": 300,
+                    "voltLimit": null,
+                    "total_n_samples": null,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                },
+                {
+                    "mode": 8,
+                    "currentRate": null,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": 2,
+                    "voltLimit": null,
+                    "total_n_samples": null,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                }
+            ]
+        },
+        {
+            "info": {
+                "channelNumber": 2,
+                "testId": "64252acf428a0869f9a3c7e8_2",
+                "overallMultiplier": 1,
+                "isConAmTe": true,
+                "ambTemp": 25,
+                "noOfSubExp": 2
+            },
+            "steps": [
+                {
+                    "mode": 1,
+                    "currentRate": null,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": null,
+                    "voltLimit": 5,
+                    "total_n_samples": null,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                },
+                {
+                    "mode": 2,
+                    "currentRate": 5,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": null,
+                    "voltLimit": 2,
+                    "total_n_samples": null,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                }
+            ]
+        },
+        {
+            "info": {
+                "channelNumber": 3,
+                "testId": "64252acf428a0869f9a3c7e8_3",
+                "overallMultiplier": 1,
+                "isConAmTe": true,
+                "ambTemp": 25,
+                "noOfSubExp": 1
+            },
+            "steps": [
+                {
+                    "mode": 7,
+                    "currentRate": null,
+                    "resVal": null,
+                    "powVal": null,
+                    "timeLimit": 10800,
+                    "voltLimit": null,
+                    "total_n_samples": 4,
+                    "multiplier": 1,
+                    "ambTemp": 25,
+                    "holdVolt": null
+                }
+            ]
+        }
+    ],
+    "testId": "64252acf428a0869f9a3c7e7",
+    "noOfChannels": 3
+}

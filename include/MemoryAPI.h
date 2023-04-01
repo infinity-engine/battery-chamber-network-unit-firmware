@@ -33,6 +33,11 @@ public:
     void setup();
     void printCardType();
     void errorPrint();
+    bool writeFile(const char *fileContent, const char *filePath);
+    void readFile(const char *filePath);
+    String valueInBetween(const char *filePath, const char *startKey, const char *endKey, u_int64_t *position = NULL);
+    bool findKeyInFile(const char *key);
+    bool readFileUntil(String &str, const char *key);
     SdFs sd;
     FsFile file;
     cid_t cid;
@@ -41,6 +46,8 @@ public:
     uint8_t cmd6Data[64];
     uint32_t eraseSize;
     uint32_t ocr;
+    uint32_t cardSize; // in MB
+    uint32_t freeSize; // in MB
 };
 
 #endif

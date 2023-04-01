@@ -24,7 +24,7 @@ public:
     String makePostReq(String url, String jsonString);
     String makeGetReq(String url);
     bool checkInternetConnectivity();
-    void fetchExp();
+    String fetchExp();
     bool sendMeasurement(u_int8_t channelNo, String measurement);
     bool setStatus(String status, u_int8_t channelNo = 0, u_int8_t rowNo = 0);
     bool resolveResponse(String response);

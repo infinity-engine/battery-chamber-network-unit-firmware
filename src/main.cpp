@@ -9,9 +9,11 @@
 #include "functionPrototype.h"
 #include "NetWorkManager.h"
 #include "MemoryAPI.h"
+#include "ConversationAPI.h"
 
 NetWorkManager net_manager;
 MemoryAPI memory_api;
+ConversationAPI conversation_api;
 
 void test();
 void setup()
@@ -21,10 +23,11 @@ void setup()
   // Serial.setDebugOutput(true);
   net_manager.setup();
   memory_api.setup();
+  conversation_api.isReady = true;
 }
 void loop()
 {
-  test();
+  conversation_api.detectMsgID(net_manager, memory_api);
 }
 
 void test()
