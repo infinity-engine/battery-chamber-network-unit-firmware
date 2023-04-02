@@ -192,10 +192,12 @@ void MemoryAPI::readFile(const char *filePath)
     file = sd.open(filePath);
     if (file)
     {
+        Serial.println(F("------Start-------"));
         while (file.available())
         {
             Serial.write(file.read());
         }
+        Serial.println(F("\n------End-------"));
         file.close();
     }
     else
@@ -217,7 +219,6 @@ void MemoryAPI::readFile(const char *filePath)
 String MemoryAPI::valueInBetween(const char *filePath, const char *startKey, const char *endKey, u_int64_t *position)
 {
     String value = "";
-
     // Check if the file exists
     if (!sd.exists(filePath))
     {
@@ -233,7 +234,9 @@ String MemoryAPI::valueInBetween(const char *filePath, const char *startKey, con
         return value;
     }
     if (position != NULL)
+    {
         file.seek(*position);
+    }
 
     if (!findKeyInFile(startKey) || !readFileUntil(value, endKey))
     {
@@ -307,12 +310,8 @@ bool MemoryAPI::readFileUntil(String &str, const char *key)
             else
             {
                 // The characters read didn't match the key, add them to the string
-                size_t j;
-                for (j = 0; j < i; j++)
-                {
-                    str += key[j];
-                }
-                file.seek(file.position() - (i - 1)); // Move the file pointer back to the next character
+                str += c;
+                file.seek(file.position() - i); // Move the file pointer back to the next character
             }
         }
         else

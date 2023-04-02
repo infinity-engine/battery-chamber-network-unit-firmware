@@ -12,9 +12,8 @@ public:
     bool isReady;
     void detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api);
     void ClearIncomingBuffer();
-    bool findKeyInFile(File &file, const char *key);
     void testInfoReset();
-    void sendTestInfo(MemoryAPI &mem_api);
+    void sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man);
     uint8_t onNoOfChannel; // tells on which channel curently data are to be sent
     uint8_t onNoOfRowOfCh; // tells about on which rows info has to be been sent to for the current channel
     uint8_t noOfChannels;  // total no of chennels available
@@ -24,6 +23,9 @@ public:
     u_int64_t filePostion;
     const char *expConfigPath = "EXP_CONFIG.json";
     StaticJsonDocument<256> rowInfoDoc;
+    StaticJsonDocument<400> configDoc;
     bool isRowInfoSent;
+    bool isDriveCycleForRowSent;
+    String driveCycleRow;
 };
 #endif
