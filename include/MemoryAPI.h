@@ -29,7 +29,7 @@ class MemoryAPI
 {
 public:
     MemoryAPI();
-    bool cleanDir();
+    bool cleanDir(String path);
     void setup();
     void printCardType();
     void errorPrint();

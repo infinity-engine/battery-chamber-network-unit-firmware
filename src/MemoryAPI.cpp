@@ -323,34 +323,21 @@ bool MemoryAPI::readFileUntil(String &str, const char *key)
     return false; // The key was not found in the file
 }
 
-bool MemoryAPI::cleanDir()
+bool MemoryAPI::cleanDir(String path)
 {
-    if (!file)
+    FatFile cwd;
+    const char *path_c = path.c_str();
+    if (!cwd.open(path_c))
     {
-        IS_LOG_ENABLED ? Serial.println(F("invalid file.")) : 0;
+        IS_LOG_ENABLED ? Serial.println(F("CWD path open failed.")) : 0;
         return false;
     }
-    char f_name[20];
-    file = file.openNextFile(FILE_WRITE);
-    while (file)
+    if (!cwd.rmRfStar())
     {
-        if (!file.isDirectory())
-        {
-            file.getName(f_name, 20);
-            IS_LOG_ENABLED ? Serial.println(f_name) : 0;
-            if (!sd.remove(f_name))
-            {
-                IS_LOG_ENABLED ? Serial.println(F("file remove failed")) : 0;
-                file.close();
-                return false;
-            }
-            else
-            {
-                IS_LOG_ENABLED ? Serial.println(F("file remove success")) : 0;
-            }
-        }
-        file = file.openNextFile();
+        IS_LOG_ENABLED ? Serial.println(F("O/P dir exist. Remove failed.")) : 0;
+        return false;
     }
-    file.close();
+    IS_LOG_ENABLED ? Serial.println(F("Cleaned o/p dir.")) : 0;
+    cwd.close();
     return true;
 }

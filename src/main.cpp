@@ -18,7 +18,7 @@ ConversationAPI conversation_api;
 void test();
 void setup()
 {
-
+  // Serial.setRxBufferSize(SERIAL_RX_BUFFER_SIZE);
   Serial.begin(2000000);
   // Serial.setDebugOutput(true);
   net_manager.setup();
