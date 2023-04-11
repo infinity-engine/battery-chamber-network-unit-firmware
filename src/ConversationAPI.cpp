@@ -75,7 +75,7 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
         {
             checkForEXP(net_man, mem_api);
         }
-        ` else if (msgId == "SEND_TEST")
+        else if (msgId == "SEND_TEST")
         {
             sendTestInfo(mem_api, net_man);
         }
