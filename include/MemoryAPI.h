@@ -38,6 +38,8 @@ public:
     String valueInBetween(const char *filePath, const char *startKey, const char *endKey, u_int64_t *position = NULL);
     bool findKeyInFile(const char *key);
     bool readFileUntil(String &str, const char *key);
+    int bytesAvailable(Stream *stream);
+    bool writeToStream(const char *path, Stream *stream, int d = 10);
     SdFs sd;
     FsFile file;
     cid_t cid;

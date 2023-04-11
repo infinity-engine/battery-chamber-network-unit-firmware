@@ -161,6 +161,7 @@ bool MemoryAPI::writeFile(const char *fileContent, const char *filePath)
         if (!sd.remove(filePath))
         {
             IS_LOG_ENABLED ? Serial.println(F("remove failed!")) : 0;
+            file.close();
             return false;
         }
     }
@@ -169,6 +170,7 @@ bool MemoryAPI::writeFile(const char *fileContent, const char *filePath)
     if (!file)
     {
         IS_LOG_ENABLED ? Serial.println(F("file open failed!")) : 0;
+        file.close();
         return false;
     }
     file.print(fileContent);
@@ -231,6 +233,7 @@ String MemoryAPI::valueInBetween(const char *filePath, const char *startKey, con
     if (!file)
     {
         IS_LOG_ENABLED ? Serial.println(F("File open failed.")) : 0;
+        file.close();
         return value;
     }
     if (position != NULL)
@@ -339,5 +342,41 @@ bool MemoryAPI::cleanDir(String path)
     }
     IS_LOG_ENABLED ? Serial.println(F("Cleaned o/p dir.")) : 0;
     cwd.close();
+    return true;
+}
+
+int MemoryAPI::bytesAvailable(Stream *stream)
+{
+    int bytesAvailable = stream->available();
+
+    if (bytesAvailable >= 60)
+    {
+        IS_LOG_ENABLED ? Serial.println(F("Warning: incoming buffer is almost full!")) : 0;
+    }
+    if (bytesAvailable == 64)
+    {
+        IS_LOG_ENABLED ? Serial.println(F("Error: incoming buffer overflow!")) : 0;
+    }
+    return bytesAvailable;
+}
+
+bool MemoryAPI::writeToStream(const char *path, Stream *stream, int d)
+{
+    if (!sd.chdir("/"))
+    {
+        return false;
+    }
+    file = sd.open(path);
+    if (!file)
+    {
+        file.close();
+        return false;
+    }
+    while (file.available())
+    {
+        stream->write(file.read());
+        delay(d);
+    }
+    file.close();
     return true;
 }
