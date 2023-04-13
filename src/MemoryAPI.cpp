@@ -1,4 +1,5 @@
 #include "MemoryAPI.h"
+#include "NetWorkManager.h"
 char line[40];
 
 //------------------------------------------------------------------------------
@@ -78,6 +79,7 @@ void MemoryAPI::setup()
     IS_LOG_ENABLED ? Serial.println(F("SD initialization success.")) : 0;
 
     IS_LOG_ENABLED ? sd.ls("/", LS_R) : 0;
+    continueReadAndSendInstruction = false;
 }
 
 void MemoryAPI::errorPrint()
@@ -380,3 +382,195 @@ bool MemoryAPI::writeToStream(const char *path, Stream *stream, int d)
     file.close();
     return true;
 }
+
+/**
+ * @brief Reads data from file and converts it into a JSON string.
+ *
+ * @param buffer Pointer to a character array to store the JSON string.
+ * @return true If data was read and converted successfully.
+ * @return false If there was an error while reading or converting the data.
+ */
+bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
+{
+    char line[LINE_LEN]; // Buffer to store a line from the file
+    line[0] = '\0';
+    // Check if there is data available in the file
+    if (file.available())
+    {
+        // Read a line from the file
+        int bytesRead = file.readBytesUntil('\n', buffer, LINE_LEN);
+        buffer[bytesRead] = '\0'; // Add a null terminator to the end of the line
+
+        // Skip empty lines or comments
+        if (line[0] == '\0' || line[0] == '#')
+        {
+            return false;
+        }
+
+        char *time = strtok(NULL, ",");        // Time
+        char *voltageStr = strtok(NULL, ",");  // Voltage as string
+        char *currentStr = strtok(NULL, ",");  // Current as string
+        char *chamTempStr = strtok(NULL, ","); // Chamber temperature as string
+        char *chamHumStr = strtok(NULL, ",");  // Chamber humidity as string
+        char *cellTempStr[CELL_TEMP_COUNT];    // Array to store cell temperatures as strings
+        int cellTempCount = 0;                 // Number of cell temperatures found in the line
+        for (char *cellTemp = strtok(NULL, ","); cellTemp != NULL; cellTemp = strtok(NULL, ","))
+        {
+            cellTempStr[cellTempCount++] = cellTemp;
+        }
+
+        // Convert the values to JSON string
+        // Start with chamber temperature and humidity
+        sprintf(buffer, "{\"chamberTemp\":[%s],\"chamberHum\":[%s],\"cellTemp\":[", chamTempStr, chamHumStr);
+
+        // Add cell temperatures
+        for (int i = 0; i < cellTempCount; i++)
+        {
+            // Each cell temperature is represented as a JSON object with "sensorId" and "values" properties
+            sprintf(buffer + strlen(buffer), "{\"sensorId\":%d,\"values\":[%s]}", i + 1, cellTempStr[i]);
+            if (i < cellTempCount - 1)
+            {
+                strcat(buffer, ","); // Add comma between cell temperature objects
+            }
+        }
+
+        // Add remaining values: current, voltage, and time
+        sprintf(buffer + strlen(buffer), "],\"current\":[%s],\"voltage\":[%s],\"time\":[%s]}", currentStr, voltageStr, time);
+    }
+    return true;
+}
+
+void MemoryAPI::readAndSendInstruction(NetWorkManager &nwm)
+{
+    if (!sd.chdir("/"))
+        return;
+    file = sd.open("instructions.txt");
+    if (!file)
+        return;
+    while (continueReadAndSendInstruction || file.available())
+    {
+        String ins = file.readStringUntil('\n');
+        if (ins == "MT")
+        {
+            // send measurement
+            uint8_t retry = 3;
+            int channel = file.readStringUntil('\n').toInt();
+            char buffer[Measuremnt_JSON_Buff_Size];
+            if (!readDataFromFileAndConvertToJson(buffer))
+            {
+                // skip this measurement
+                continue;
+            }
+
+            for (uint8_t i = 0; i < retry; i++)
+            {
+                if (nwm.sendMeasurement(channel, String(buffer)))
+                {
+                    continue; // success
+                }
+            }
+        }
+        else if (ins == "IM")
+        {
+            // increment multiplier
+            // get the channel and row
+            int channel = 0;
+            int row = 0;
+            String d = "";
+            char c = '\0';
+            while (file.available())
+            {
+                c = file.read();
+                if (c != ',' && c != '\n')
+                {
+                    d += c;
+                }
+            }
+            channel = d.toInt();
+            if (c == ',')
+            {
+                row = file.readStringUntil('\n').toInt();
+            }
+            while (!nwm.incrementMultiPlierIndex(channel, row))
+                ;
+        }
+        else if (ins == "SS")
+        {
+            // increment multiplier
+            // get the channel and row
+            int channel = 0;
+            int row = 0;
+            String d = "";
+            char c = '\0';
+            while (file.available())
+            {
+                c = file.read();
+                if (c != ',' && c != '\n')
+                {
+                    d += c;
+                }
+            }
+            channel = d.toInt();
+            if (c == ',')
+            {
+                row = file.readStringUntil('\n').toInt();
+            }
+            uint8_t status = file.readStringUntil('\n').toInt();
+            String statusS = "";
+            switch (status)
+            {
+            case EXP_FINISHED:
+                statusS = "Completed";
+                break;
+            case EXP_PAUSED:
+                statusS = "Paused";
+                break;
+            case EXP_STOPPED:
+                statusS = "Stopped";
+                break;
+            default:
+                break;
+            }
+
+            while (!nwm.setStatus(statusS, channel, row))
+                ;
+        }
+        else if (ins == "DONE")
+        {
+            // this should be received after completion of all test across all channels
+            continueReadAndSendInstruction = false;
+        }
+    }
+    file.close();
+    sd.chdir("/");
+    sd.remove("instructions.txt"); // after completing all instructions remove the file
+}
+
+void MemoryAPI::writeInstructions()
+{
+    FsFile file_;
+    file_ = sd.open("instructions.txt", O_WRONLY | O_CREAT);
+    if (!file_)
+    {
+        return;
+    }
+    while (Serial.available())
+    {
+        file_.print(Serial.readStringUntil('\n'));
+    }
+    file_.close();
+    return;
+}
+
+void MemoryAPI::beginInterrupt()
+{
+    pinMode(ESP_INT_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(ESP_INT_PIN), writeInstructions, RISING);
+}
+
+void MemoryAPI::endInterrupt()
+{
+    detachInterrupt(digitalPinToInterrupt(ESP_INT_PIN));
+}
+
+SdFs MemoryAPI::sd; // to solve linking problem as it is static member to be able to use it in other class

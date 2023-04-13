@@ -18,6 +18,7 @@ bool NetWorkManager::setup()
         delay(1000);
     }
     IS_LOG_ENABLED ? Serial.println(F("WiFi has internet connectivity.")) : 0;
+    testId = "";
     return true;
 }
 

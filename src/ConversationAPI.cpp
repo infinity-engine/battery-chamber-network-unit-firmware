@@ -1,13 +1,36 @@
 #include "ConversationAPI.h"
-
+#include "NetWorkManager.h"
+#include "MemoryAPI.h"
 // when ever you receive any instruction always run clearbuffer after the instructin
-// when ever you send multiline instructin always send \r except last line
+// when ever you send multiline instructin always send \n except last line
 
 ConversationAPI::ConversationAPI()
 {
+}
+
+/**
+ * @brief
+ *
+ */
+void ConversationAPI::setup()
+{
     isReady = false;
     testInfoReset();
+    onNoOfChannel = 0;
+    onNoOfRowOfCh = 0;
+    noOfChannels = 0;
+    noOfRows = 0;
+    testId = "";
+    rowInfo = "";
+    filePostion = 0;
+    isRowInfoSent = false;
+    isDriveCycleForRowSent = true;
 }
+
+/**
+ * @brief
+ *
+ */
 void ConversationAPI::testInfoReset()
 {
     testId = "";
@@ -20,6 +43,13 @@ void ConversationAPI::testInfoReset()
     isRowInfoSent = false;
     isDriveCycleForRowSent = true;
 }
+
+/**
+ * @brief
+ *
+ * @param net_man
+ * @param mem_api
+ */
 void ConversationAPI::checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api)
 {
     // look for experiment
@@ -29,13 +59,13 @@ void ConversationAPI::checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api)
     if (strcmp(exp_config, "null") == 0)
     {
         // matched
-        Serial.print(F("NO\r"));
+        Serial.print(F("NO\n"));
     }
     else
     {
         if (!mem_api.writeFile(exp_config, expConfigPath))
         {
-            Serial.print(F("NO\r"));
+            Serial.print(F("NO\n"));
             return;
         }
         // mem_api.sd.ls("/", LS_R);
@@ -46,7 +76,7 @@ void ConversationAPI::checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api)
         testId = mem_api.valueInBetween(expConfigPath, "],\"testId\":\"", "\"");
         if (testId.length() < 1)
         {
-            Serial.print(F("NO\r"));
+            Serial.print(F("NO\n"));
             return;
         }
         net_man.testId = testId;
@@ -54,22 +84,28 @@ void ConversationAPI::checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api)
         IS_LOG_ENABLED
         ? Serial.println(testId)
         : 0;
-        Serial.print(F("YES\r"));
+        Serial.print(F("YES\n"));
     }
 }
 
+/**
+ * @brief
+ *
+ * @param net_man
+ * @param mem_api
+ */
 void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
 {
-    // arduino Serial.println() sends \r\n at the end
+    // arduino Serial.println() sends \n\n at the end
     if (Serial.available())
     {
-        String msgId = Serial.readStringUntil('\r');
+        String msgId = Serial.readStringUntil('\n');
         clearIncomingBuffer(); // clear all the input buffer after receiving any command
         blink();
 
         if (msgId == "IS_READY")
         {
-            isReady ? Serial.print(F("YES\r")) : Serial.print(F("NO\r"));
+            isReady ? Serial.print(F("YES\n")) : Serial.print(F("NO\n"));
         }
         else if (msgId == "IS_EXP")
         {
@@ -79,31 +115,34 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
         {
             sendTestInfo(mem_api, net_man);
         }
-        else if (msgId == "IN_SD_EXP")
+        else if (msgId == "START")
         {
             // initiate sd card for output measurement
             //  followed by
             //  8c4a
             //  4
             //  1,4,2,5
-            String expName = Serial.readStringUntil('\r');
-            uint8_t noOfChannels = Serial.readStringUntil('\r').toInt();
-            const char *channelStr = Serial.readStringUntil('\r').c_str();
-            if (initSDForEXP(mem_api, expName, noOfChannels, channelStr))
-                Serial.print(F("YES\r"));
+            if (initSDForEXP(mem_api) && net_man.setStatus("Running"))
+            {
+                Serial.print(F("YES\n"));
+                mem_api.beginInterrupt();
+            }
             else
-                Serial.println(F("NO\r"));
-        }
-
-        else if (msgId == "MNT")
-        {
-            // start receiving measurement and store them in sd card
-            // this call happen on interrupt basis so do as least as you should do.
+            {
+                Serial.println(F("NO\n"));
+                return;
+            }
+            mem_api.continueReadAndSendInstruction = true;
+            mem_api.readAndSendInstruction(net_man); // infinite cycle until the experiment is complete or stopped
+            // reset for next instruction
+            mem_api.endInterrupt();
+            mem_api.setup();
+            setup();
         }
 
         else
         {
-            Serial.print(F("INVALID\r"));
+            Serial.print(F("INVALID\n"));
             testId = "";
             clearIncomingBuffer();
         }
@@ -111,53 +150,21 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
 }
 
 /**
- * @brief make the output diroctory for measurements
+ * @brief
  *
  * @param mem_api
- * @param expName "8c5a"
- * @param channels "1,3,5"
  * @return true
  * @return false
  */
-bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, String expName, uint8_t noOfChannels, const char *channelsStr)
+bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api)
 {
-    uint8_t channels[noOfChannels];
-    const char *c = channelsStr;
-    uint8_t i;
-    for (i = 0; i < noOfChannels; i++)
-    {
-        String digit = "";
-        while (*c != ',' && *c != '\n' && *c != '\0')
-        {
-            digit += *c;
-        }
-        channels[i] = digit.toInt();
-    }
-    if (i < noOfChannels)
-    {
-        // All channels not found
-        return false;
-    }
-    // make directory on the name of expName if exists delete
-    if (mem_api.sd.chdir("/") && mem_api.sd.exists(expName) && !mem_api.cleanDir(expName))
+    if (!mem_api.sd.chdir("/"))
     {
         return false;
     }
-
-    // create output directory.
-    if (!mem_api.sd.chdir("/") || !mem_api.sd.mkdir(expName))
+    if (mem_api.sd.exists("instructions.txt") && !mem_api.sd.remove("instructions.txt"))
     {
         return false;
-    }
-    for (i = 0; i < noOfChannels; i++)
-    {
-        mem_api.file = mem_api.sd.open(expName + "/" + channels[i] + ".csv", O_WRONLY | O_CREAT);
-        if (!mem_api.file)
-        {
-            mem_api.file.close();
-            return false;
-        }
-        mem_api.file.close();
     }
     return true;
 }
@@ -184,7 +191,7 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
 
     if (testId.length() == 0)
     {
-        Serial.print(F("INVALID\r"));
+        Serial.print(F("INVALID\n"));
         return;
     }
     if (onNoOfRowOfCh > noOfRows)
@@ -195,7 +202,7 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
     }
     if (onNoOfChannel > noOfChannels)
     {
-        Serial.print(F("NULL\r"));
+        Serial.print(F("NULL\n"));
         testInfoReset();
         return;
     }
@@ -206,9 +213,9 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
         noOfChannels = mem_api.valueInBetween(expConfigPath, "\"noOfChannels\":", "}").toInt();
         if (noOfChannels > 0)
         {
-            Serial.print(F("YES\r"));
+            Serial.print(F("YES\n"));
             Serial.print(testId);
-            Serial.print("\r");
+            Serial.print("\n");
             onNoOfChannel += 1;
         }
         return;
@@ -224,29 +231,29 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
                 Serial.print(F("deserializeJson() failed: "));
                 Serial.println(error.f_str());
             }
-            Serial.print(F("NULL\r"));
+            Serial.print(F("NULL\n"));
             testInfoReset();
             return;
         }
         noOfRows = (uint8_t)rowInfoDoc["noOfSubExp"];
         String channelFolder = testId + "_" + (uint8_t)rowInfoDoc["channelNumber"];
-        Serial.print(F("DIR\r"));
+        Serial.print(F("DIR\n"));
         delay(100);
-        Serial.print(testId + "/" + channelFolder + "/inputs\r");
+        Serial.print(testId + "/" + channelFolder + "/inputs\n");
         delay(100);
-        Serial.print(testId + "/" + channelFolder + "/outputs\r");
+        Serial.print(testId + "/" + channelFolder + "/outputs\n");
         onNoOfRowOfCh += 1;
         return;
     }
     if (!isRowInfoSent)
     {
         String channelFolder = testId + "_" + (uint8_t)rowInfoDoc["channelNumber"];
-        Serial.print(F("FILE\r"));
+        Serial.print(F("FILE\n"));
         delay(100);
-        Serial.print(testId + "/" + channelFolder + "/inputs/config.json\r");
+        Serial.print(testId + "/" + channelFolder + "/inputs/config.json\n");
         delay(100);
         Serial.print(rowInfo);
-        Serial.print("\r");
+        Serial.print("\n");
         isRowInfoSent = true;
         return;
     }
@@ -254,9 +261,9 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
     {
         // send drive cyle
         String channelFolder = testId + "_" + (uint8_t)rowInfoDoc["channelNumber"];
-        Serial.print(F("FILE\r"));
+        Serial.print(F("FILE\n"));
         delay(100);
-        Serial.print(testId + "/" + channelFolder + "/inputs/" + onNoOfRowOfCh + "_" + "driveCycle.csv\r");
+        Serial.print(testId + "/" + channelFolder + "/inputs/" + onNoOfRowOfCh + "_" + "driveCycle.csv\n");
         delay(100);
         mem_api.writeToStream("driveCycle.csv", &Serial);
         Serial.print('\r'); // carriage return to be able to detect by arduino
@@ -282,7 +289,7 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
     config = mem_api.valueInBetween(expConfigPath, startKey.c_str(), endKey.c_str(), &filePostion);
     if (config.length() == 0)
     {
-        Serial.print(F("NULL\r"));
+        Serial.print(F("NULL\n"));
         testInfoReset();
         return;
     }
@@ -295,17 +302,17 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
             Serial.println(error.f_str());
         }
         testInfoReset();
-        Serial.print(F("NULL\r"));
+        Serial.print(F("NULL\n"));
         return;
     }
 
     String channelFolder = testId + "_" + (uint8_t)rowInfoDoc["channelNumber"];
-    Serial.print(F("FILE\r"));
+    Serial.print(F("FILE\n"));
     delay(100);
-    Serial.print(testId + "/" + channelFolder + "/inputs/" + onNoOfRowOfCh + "_" + "config.json\r");
+    Serial.print(testId + "/" + channelFolder + "/inputs/" + onNoOfRowOfCh + "_" + "config.json\n");
     delay(100);
     Serial.print(config);
-    Serial.print("\r");
+    Serial.print("\n");
 
     if (configDoc["mode"] == 7)
     {
@@ -320,6 +327,10 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
     }
 }
 
+/**
+ * @brief
+ *
+ */
 void ConversationAPI::clearIncomingBuffer()
 {
     int d = 50; // wait for 50ms atleast

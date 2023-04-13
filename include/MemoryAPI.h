@@ -23,7 +23,10 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SD_SCK_MHZ(16))
 #endif // HAS_SDIO_CLASS
 
+#define LINE_LEN 100
 static ArduinoOutStream cout(Serial);
+class NetWorkManager;
+#define Measuremnt_JSON_Buff_Size 300
 
 class MemoryAPI
 {
@@ -40,7 +43,13 @@ public:
     bool readFileUntil(String &str, const char *key);
     int bytesAvailable(Stream *stream);
     bool writeToStream(const char *path, Stream *stream, int d = 10);
-    SdFs sd;
+    bool readDataFromFileAndConvertToJson(char *buffer);
+    void readAndSendInstruction(NetWorkManager &nwm);
+    void beginInterrupt();
+    void endInterrupt();
+    bool continueReadAndSendInstruction;
+    static void writeInstructions();
+    static SdFs sd;
     FsFile file;
     cid_t cid;
     csd_t csd;
