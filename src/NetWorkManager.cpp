@@ -1,19 +1,34 @@
 #include "NetWorkManager.h"
+#include <AsyncHTTPRequest_Generic.h>
+
+requestCallback requestCB[MAX_NO_CHANNELS + 1] = {requestCB0, requestCB1, requestCB2, requestCB3, requestCB4, requestCB5, requestCB6};
+bool readyToSend[MAX_NO_CHANNELS + 1];
+bool isPrevReqSuccess[MAX_NO_CHANNELS + 1];
+AsyncHTTPRequest request[MAX_NO_CHANNELS + 1];
+String responseText_0;
 
 NetWorkManager::NetWorkManager() {}
 
 bool NetWorkManager::setup()
 {
+    responseText_0 = "";
     WiFi.mode(WIFI_STA);
-    while (!wifi.addAP(WiFi_SSID, WiFi_PWD))
+    WiFi.begin(WiFi_SSID, WiFi_PWD);
+    while (WiFi.status() != WL_CONNECTED)
     {
-        IS_LOG_ENABLED ? Serial.println("Trying to connect to the WiFi ") : 0;
+        IS_LOG_ENABLED ? Serial.print('.') : 0;
         delay(1000);
     }
-    Serial.println(F("WiFi connection success!"));
+    IS_LOG_ENABLED ? Serial.println(F("\nWiFi connection success!")) : 0;
+    for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
+    {
+        readyToSend[i] = true;
+        isPrevReqSuccess[i] = true;
+        request[i].setDebug(false);
+        request[i].onReadyStateChange(requestCB[i]);
+    }
     while (!checkInternetConnectivity())
     {
-
         IS_LOG_ENABLED ? Serial.println(F("WiFi doesn't have internet access.")) : 0;
         delay(1000);
     }
@@ -22,58 +37,25 @@ bool NetWorkManager::setup()
     return true;
 }
 
+// on channel 0
 String NetWorkManager::makePostReq(String url, String jsonString)
 {
     // on average taking around 500ms-1s max
-    String response = "";
-    if (wifi.run() == WL_CONNECTED)
+    if (WiFi.status() == WL_CONNECTED)
     {
-        if (http.begin(client, url))
-        {
-            http.addHeader("Content-Type", "application/json");
-            int httpCode = http.POST(jsonString);
-            if (httpCode > 0)
-            {
-                if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED)
-                {
-                    response = http.getString();
-                }
-            }
-            else
-            {
-                IS_LOG_ENABLED ? Serial.printf("[HTTP] POST failed, error: %s\n", http.errorToString(httpCode).c_str()) : 0;
-            }
-        }
-        http.end();
+        sendRequest("POST", url.c_str(), jsonString);
     }
-    return response;
+    return responseText_0;
 }
 
+// on channel 0
 String NetWorkManager::makeGetReq(String url)
 {
-    String response = "";
-    if (wifi.run() == WL_CONNECTED)
+    if (WiFi.status() == WL_CONNECTED)
     {
-        if (http.begin(client, url))
-        {
-            int httpCode = http.GET();
-            if (httpCode > 0)
-            {
-                // httpcode will be negative on error
-                if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
-                {
-                    response = http.getString();
-                }
-            }
-            else
-            {
-                IS_LOG_ENABLED ? Serial.printf("[HTTP] POST failed, error: %s\n", http.errorToString(httpCode).c_str()) : 0;
-            }
-        }
-        http.end();
+        sendRequest("GET", url.c_str());
     }
-
-    return response;
+    return responseText_0;
 }
 
 /**
@@ -89,15 +71,14 @@ String NetWorkManager::fetchExp()
     return makeGetReq(url);
 }
 
-bool NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)
+void NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)
 {
-
     const char *base = API_Base;
     String url = String(base) + "feed-exp-result/insert-measurement?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo;
-    return resolveResponse(makePostReq(url, measurement));
+    sendRequest("POST", url.c_str(), measurement, channelNo, false);
 }
 
-bool NetWorkManager::setStatus(String status, u_int8_t channelNo, u_int8_t rowNo)
+void NetWorkManager::setStatus(String status, u_int8_t channelNo, u_int8_t rowNo)
 {
     const char *base = API_Base;
 
@@ -111,10 +92,10 @@ bool NetWorkManager::setStatus(String status, u_int8_t channelNo, u_int8_t rowNo
         url += "&row=" + rowNo;
     }
     url += "&status=" + status;
-    return resolveResponse(makeGetReq(url));
+    sendRequest("GET", url.c_str(), "", channelNo);
 }
 
-bool NetWorkManager::incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo)
+void NetWorkManager::incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo)
 {
     const char *base = API_Base;
     String url = String(base) + "feed-exp-result/increment-multiplier-index?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo;
@@ -122,7 +103,7 @@ bool NetWorkManager::incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo
     {
         url += "&row=" + rowNo;
     }
-    return resolveResponse(makeGetReq(url));
+    sendRequest("GET", url.c_str(), "", channelNo, false);
 }
 
 String NetWorkManager::getDriveCycle(u_int8_t channelNo, u_int8_t rowNo)
@@ -142,19 +123,16 @@ String NetWorkManager::updatedUpto(u_int8_t channelNo)
 bool NetWorkManager::checkInternetConnectivity()
 {
 
-    if (wifi.run() == WL_CONNECTED)
+    if (WiFi.status() == WL_CONNECTED)
     {
-        http.begin(client, "http://clients3.google.com/generate_204");
-
-        int httpCode = http.GET();
-        if (httpCode == HTTP_CODE_NO_CONTENT)
+        const char *url = "http://clients3.google.com/generate_204";
+        sendRequest("GET", url);
+        if (isPrevReqSuccess[0])
         {
-            http.end();
             return true;
         }
         else
         {
-            http.end();
             return false;
         }
     }
@@ -183,4 +161,239 @@ bool NetWorkManager::resolveResponse(String response)
         return true;
     }
     return false;
+}
+
+void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[0] = true;
+            responseText_0 = thisRequest->responseText();
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[0] = false;
+            responseText_0 = "";
+        }
+        readyToSend[0] = true;
+    }
+}
+
+void requestCB1(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[1] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[1] = false;
+        }
+        readyToSend[1] = true;
+    }
+}
+
+void requestCB2(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[2] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[2] = false;
+        }
+        readyToSend[2] = true;
+    }
+}
+
+void requestCB3(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[3] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[3] = false;
+        }
+        readyToSend[3] = true;
+    }
+}
+
+void requestCB4(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[4] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[4] = false;
+        }
+        readyToSend[4] = true;
+    }
+}
+
+void requestCB5(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[5] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[5] = false;
+        }
+        readyToSend[5] = true;
+    }
+}
+
+void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
+{
+    (void)optParm;
+
+    if (readyState == readyStateDone)
+    {
+        // Serial.println(thisRequest->responseHTTPString());
+
+        if (thisRequest->responseHTTPcode() == 200)
+        {
+            if (IS_LOG_ENABLED)
+            {
+                Serial.println(F("\n**************************************"));
+                Serial.println(thisRequest->responseText());
+                Serial.println(F("**************************************"));
+            }
+            isPrevReqSuccess[6] = true;
+        }
+        else
+        {
+            IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
+            isPrevReqSuccess[6] = false;
+        }
+        readyToSend[6] = true;
+    }
+}
+
+/**
+ * @brief send http request asynchronous or synchronously
+ * if the reqChannel is =0 then all the request will be synchronous
+ * @param method "GET"|"POST"
+ * @param url
+ * @param body
+ * @param reqChannel
+ * @param isSynchronous
+ */
+void NetWorkManager::sendRequest(const char *method, const char *url, String body, uint8_t reqChannel, bool isSynchronous)
+{
+    bool requestOpenRes = request[reqChannel].open(method, url);
+    isPrevReqSuccess[reqChannel] = false;
+    if (reqChannel == 0)
+    {
+        responseText_0 = "";
+        isSynchronous = false;
+    }
+    if (requestOpenRes)
+    {
+        if (body.length() > 0)
+        {
+            request[reqChannel].setReqHeader("Content-Type", "application/json");
+            request[reqChannel].send(body.c_str());
+        }
+        else
+        {
+            request[reqChannel].send();
+        }
+        readyToSend[reqChannel] = false;
+    }
+    else
+    {
+        IS_LOG_ENABLED ? Serial.println(F("Req sent failed")) : 0;
+        return;
+    }
+    if (isSynchronous)
+    {
+        // wait until the req get resolved
+        while (!readyToSend[reqChannel])
+            ;
+    }
 }

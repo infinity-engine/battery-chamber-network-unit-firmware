@@ -18,7 +18,7 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #if HAS_SDIO_CLASS
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
 #elif ENABLE_DEDICATED_SPI
-#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SD_SCK_MHZ(16))
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SD_SCK_MHZ(26))
 #else // HAS_SDIO_CLASS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SD_SCK_MHZ(16))
 #endif // HAS_SDIO_CLASS
@@ -26,6 +26,7 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #define LINE_LEN 100
 static ArduinoOutStream cout(Serial);
 class NetWorkManager;
+class InstructionsHandler;
 #define Measuremnt_JSON_Buff_Size 300
 
 class MemoryAPI
@@ -47,9 +48,14 @@ public:
     void readAndSendInstruction(NetWorkManager &nwm);
     void beginInterrupt();
     void endInterrupt();
-    bool continueReadAndSendInstruction;
-    static void writeInstructions();
-    static SdFs sd;
+    String overallStatus;
+    bool isContinueReadingInsSerial;
+    void writeInstructions(uint8_t channelNo, InstructionsHandler *inh);
+    void readInstructions();
+    void wrapup(NetWorkManager *nwm);
+    static void IRAM_ATTR raiseFlagForInt();
+    static bool isInstructionAvailable;
+    SdFs sd;
     FsFile file;
     cid_t cid;
     csd_t csd;
@@ -59,6 +65,8 @@ public:
     uint32_t ocr;
     uint32_t cardSize; // in MB
     uint32_t freeSize; // in MB
+
+    InstructionsHandler *irhArray[MAX_NO_CHANNELS];
 };
 
 #endif

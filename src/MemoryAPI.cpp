@@ -1,5 +1,7 @@
 #include "MemoryAPI.h"
 #include "NetWorkManager.h"
+#include "InstructionsHandler.h"
+
 char line[40];
 
 //------------------------------------------------------------------------------
@@ -79,7 +81,12 @@ void MemoryAPI::setup()
     IS_LOG_ENABLED ? Serial.println(F("SD initialization success.")) : 0;
 
     IS_LOG_ENABLED ? sd.ls("/", LS_R) : 0;
-    continueReadAndSendInstruction = false;
+    overallStatus = "";
+    isContinueReadingInsSerial = false;
+    for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
+    {
+        irhArray[i] = NULL;
+    }
 }
 
 void MemoryAPI::errorPrint()
@@ -398,8 +405,8 @@ bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
     if (file.available())
     {
         // Read a line from the file
-        int bytesRead = file.readBytesUntil('\n', buffer, LINE_LEN);
-        buffer[bytesRead] = '\0'; // Add a null terminator to the end of the line
+        int bytesRead = file.readBytesUntil('\n', line, LINE_LEN);
+        line[bytesRead] = '\0'; // Add a null terminator to the end of the line
 
         // Skip empty lines or comments
         if (line[0] == '\0' || line[0] == '#')
@@ -407,7 +414,7 @@ bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
             return false;
         }
 
-        char *time = strtok(NULL, ",");        // Time
+        char *time = strtok(line, ",");        // Time
         char *voltageStr = strtok(NULL, ",");  // Voltage as string
         char *currentStr = strtok(NULL, ",");  // Current as string
         char *chamTempStr = strtok(NULL, ","); // Chamber temperature as string
@@ -442,130 +449,90 @@ bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
 
 void MemoryAPI::readAndSendInstruction(NetWorkManager &nwm)
 {
-    if (!sd.chdir("/"))
-        return;
-    file = sd.open("instructions.txt");
-    if (!file)
-        return;
-    while (continueReadAndSendInstruction || file.available())
+    readInstructions();
+    for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
     {
-        String ins = file.readStringUntil('\n');
-        if (ins == "MT")
-        {
-            // send measurement
-            uint8_t retry = 3;
-            int channel = file.readStringUntil('\n').toInt();
-            char buffer[Measuremnt_JSON_Buff_Size];
-            if (!readDataFromFileAndConvertToJson(buffer))
-            {
-                // skip this measurement
-                continue;
-            }
+        if (irhArray[i] == NULL)
+            continue;
+        irhArray[i]->handleInstruction(&nwm, this);
+        readInstructions();
+    }
+}
 
-            for (uint8_t i = 0; i < retry; i++)
-            {
-                if (nwm.sendMeasurement(channel, String(buffer)))
-                {
-                    continue; // success
-                }
-            }
-        }
-        else if (ins == "IM")
+void MemoryAPI::readInstructions()
+{
+    if (!isInstructionAvailable)
+        return;
+    while (Serial.available())
+    {
+        while (Serial.read() != '|')
+            ;
+        String msg = Serial.readStringUntil('\n');
+        if (msg == "END")
         {
-            // increment multiplier
-            // get the channel and row
-            int channel = 0;
-            int row = 0;
-            String d = "";
-            char c = '\0';
-            while (file.available())
-            {
-                c = file.read();
-                if (c != ',' && c != '\n')
-                {
-                    d += c;
-                }
-            }
-            channel = d.toInt();
-            if (c == ',')
-            {
-                row = file.readStringUntil('\n').toInt();
-            }
-            while (!nwm.incrementMultiPlierIndex(channel, row))
-                ;
-        }
-        else if (ins == "SS")
-        {
-            // increment multiplier
-            // get the channel and row
-            int channel = 0;
-            int row = 0;
-            String d = "";
-            char c = '\0';
-            while (file.available())
-            {
-                c = file.read();
-                if (c != ',' && c != '\n')
-                {
-                    d += c;
-                }
-            }
-            channel = d.toInt();
-            if (c == ',')
-            {
-                row = file.readStringUntil('\n').toInt();
-            }
-            uint8_t status = file.readStringUntil('\n').toInt();
-            String statusS = "";
+            uint8_t status = Serial.readStringUntil('\n').toInt();
+            overallStatus = "";
             switch (status)
             {
             case EXP_FINISHED:
-                statusS = "Completed";
+                overallStatus = "Completed";
                 break;
             case EXP_PAUSED:
-                statusS = "Paused";
+                overallStatus = "Paused";
                 break;
             case EXP_STOPPED:
-                statusS = "Stopped";
+                overallStatus = "Stopped";
                 break;
             default:
                 break;
             }
-
-            while (!nwm.setStatus(statusS, channel, row))
-                ;
+            isContinueReadingInsSerial = false;
         }
-        else if (ins == "DONE")
+        else
         {
-            // this should be received after completion of all test across all channels
-            continueReadAndSendInstruction = false;
+            uint8_t channel = msg.toInt();
+            writeInstructions(channel, irhArray[channel - 1]);
         }
     }
-    file.close();
-    sd.chdir("/");
-    sd.remove("instructions.txt"); // after completing all instructions remove the file
+    isInstructionAvailable = false;
 }
 
-void MemoryAPI::writeInstructions()
+void IRAM_ATTR MemoryAPI::raiseFlagForInt()
 {
-    FsFile file_;
-    file_ = sd.open("instructions.txt", O_WRONLY | O_CREAT);
-    if (!file_)
+    isInstructionAvailable = true;
+}
+
+void MemoryAPI::writeInstructions(uint8_t channelNo, InstructionsHandler *irh)
+{
+    if (irh != NULL)
+        irh->writeUntil(this);
+}
+
+void MemoryAPI::wrapup(NetWorkManager *nwm)
+{
+    bool isContinue = true;
+    while (isContinue)
     {
-        return;
+        isContinue = false;
+        for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
+        {
+            if (irhArray[i] != NULL)
+            {
+                irhArray[i]->handleInstruction(nwm, this);
+                if (irhArray[i]->isInstructionAvailable)
+                    isContinue = true;
+                else
+                    irhArray[i]->wrapUp(this);
+            }
+        }
     }
-    while (Serial.available())
-    {
-        file_.print(Serial.readStringUntil('\n'));
-    }
-    file_.close();
-    return;
+    nwm->setStatus(overallStatus);
 }
 
 void MemoryAPI::beginInterrupt()
 {
-    pinMode(ESP_INT_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(ESP_INT_PIN), writeInstructions, RISING);
+    pinMode(ESP_INT_PIN, INPUT);
+    attachInterrupt(digitalPinToInterrupt(ESP_INT_PIN), raiseFlagForInt, RISING);
 }
 
 void MemoryAPI::endInterrupt()
@@ -573,4 +540,4 @@ void MemoryAPI::endInterrupt()
     detachInterrupt(digitalPinToInterrupt(ESP_INT_PIN));
 }
 
-SdFs MemoryAPI::sd; // to solve linking problem as it is static member to be able to use it in other class
+bool MemoryAPI::isInstructionAvailable;

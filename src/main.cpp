@@ -1,10 +1,3 @@
-/**
-   BasicHTTPClient.ino
-
-    Created on: 24.05.2015
-
-*/
-
 #include <Arduino.h>
 #include "functionPrototype.h"
 #include "NetWorkManager.h"
@@ -20,12 +13,6 @@ void setup()
 {
   // Serial.setRxBufferSize(SERIAL_RX_BUFFER_SIZE);
   Serial.begin(115200);
-  pinMode(LED_BUILTIN, OUTPUT);
-  // interrupts
-  pinMode(ESP_INT_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ESP_INT_PIN), MemoryAPI::writeInstructions, RISING);
-
-  // Serial.setDebugOutput(true);
   net_manager.setup();
   memory_api.setup();
   conversation_api.isReady = true;

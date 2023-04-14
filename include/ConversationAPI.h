@@ -5,6 +5,8 @@
 #include "ArduinoJson.h"
 class NetWorkManager;
 class MemoryAPI;
+#include "InstructionsHandler.h"
+
 class ConversationAPI
 {
 public:
@@ -17,7 +19,7 @@ public:
     void setup();
     void sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man);
     void checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api);
-    bool initSDForEXP(MemoryAPI &mem_api);
+    bool initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo);
     uint8_t onNoOfChannel; // tells on which channel curently data are to be sent
     uint8_t onNoOfRowOfCh; // tells about on which rows info has to be been sent to for the current channel
     uint8_t noOfChannels;  // total no of chennels available

@@ -1,6 +1,7 @@
 #include "ConversationAPI.h"
 #include "NetWorkManager.h"
 #include "MemoryAPI.h"
+
 // when ever you receive any instruction always run clearbuffer after the instructin
 // when ever you send multiline instructin always send \n except last line
 
@@ -118,23 +119,46 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
         else if (msgId == "START")
         {
             // initiate sd card for output measurement
-            //  followed by
-            //  8c4a
-            //  4
+            //  START
             //  1,4,2,5
-            if (initSDForEXP(mem_api) && net_man.setStatus("Running"))
+            String ch = "";
+            while (Serial.available())
+            {
+                char c = Serial.read();
+                if (c != ',' || c != '\n')
+                {
+                    ch += c;
+                }
+                else
+                {
+                    ch = "";
+                    if (!initSDForEXP(mem_api, ch.toInt()))
+                    {
+                        Serial.print(F("NO\n"));
+                        return;
+                    }
+                }
+            }
+            net_man.setStatus("Running");
+            if (net_man.testId != "" && isPrevReqSuccess[0])
             {
                 Serial.print(F("YES\n"));
                 mem_api.beginInterrupt();
             }
             else
             {
-                Serial.println(F("NO\n"));
+                Serial.print(F("NO\n"));
                 return;
             }
-            mem_api.continueReadAndSendInstruction = true;
-            mem_api.readAndSendInstruction(net_man); // infinite cycle until the experiment is complete or stopped
-            // reset for next instruction
+            mem_api.isContinueReadingInsSerial = true;
+            while (mem_api.isContinueReadingInsSerial)
+            {
+                mem_api.readAndSendInstruction(net_man);
+            }
+
+            // mem_api.continueReadAndSendInstruction = true;
+            // mem_api.readAndSendInstruction(net_man); // infinite cycle until the experiment is complete or stopped
+            // // reset for next instruction
             mem_api.endInterrupt();
             mem_api.setup();
             setup();
@@ -156,16 +180,20 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
  * @return true
  * @return false
  */
-bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api)
+bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo)
 {
     if (!mem_api.sd.chdir("/"))
     {
         return false;
     }
-    if (mem_api.sd.exists("instructions.txt") && !mem_api.sd.remove("instructions.txt"))
+    String fileName = "";
+    fileName += channelNo + "_instructions.txt";
+    if (mem_api.sd.exists(fileName) && !mem_api.sd.remove(fileName))
     {
         return false;
     }
+    InstructionsHandler irh(channelNo);
+    mem_api.irhArray[channelNo - 1] = &irh;
     return true;
 }
 
