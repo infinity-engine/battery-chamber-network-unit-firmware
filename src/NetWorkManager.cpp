@@ -1,6 +1,6 @@
 #include "NetWorkManager.h"
 #include <AsyncHTTPRequest_Generic.h>
-
+// connection different host than the firs one always raise an error.
 // default is 3s
 #define DEFAULT_RX_TIMEOUT 10
 
@@ -25,6 +25,8 @@ bool NetWorkManager::setup()
     IS_LOG_ENABLED ? Serial.println(F("\nWiFi connection success!")) : 0;
     for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
     {
+        AsyncHTTPRequest myReq;
+        request[i] = myReq;
         readyToSend[i] = true;
         isPrevReqSuccess[i] = true;
         request[i].setDebug(true);
@@ -150,8 +152,7 @@ bool NetWorkManager::checkInternetConnectivity()
 
     if (WiFi.status() == WL_CONNECTED)
     {
-        const char *url = "http://clients3.google.com/generate_204";
-        sendRequest("GET", url);
+        sendRequest("GET", HOST_NAME);
         if (isPrevReqSuccess[0])
         {
             return true;
@@ -404,19 +405,19 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
  */
 void NetWorkManager::sendRequest(const char *method, const char *url, String body, uint8_t reqChannel, bool isSynchronous)
 {
+    isPrevReqSuccess[reqChannel] = false;
     if (!readyToSend[reqChannel])
     {
         IS_LOG_ENABLED ? Serial.println(F("Network Channel Busy.")) : 0;
     }
     static bool requestOpenRes;
-    // request[reqChannel].setReqHeader("Content-Type", "application/json");
+    request[reqChannel].setReqHeader("Content-Type", "application/json");
     requestOpenRes = request[reqChannel].open(method, url);
     isPrevReqSuccess[reqChannel] = false;
     if (requestOpenRes)
     {
         if (body.length() > 0)
         {
-
             request[reqChannel].send(body.c_str());
         }
         else

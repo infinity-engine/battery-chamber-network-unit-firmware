@@ -241,7 +241,6 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
         noOfChannels = mem_api.valueInBetween(expConfigPath, "\"noOfChannels\":", "}").toInt();
         if (noOfChannels > 0)
         {
-            Serial.print(F("YES\n"));
             Serial.print(testId);
             Serial.print("\n");
             onNoOfChannel += 1;

@@ -20,9 +20,9 @@ void setup()
 }
 void loop()
 {
-  // conversation_api.detectMsgID(net_manager, memory_api);
-  test();
-  delay(10000);
+  conversation_api.detectMsgID(net_manager, memory_api);
+  // test();
+  // delay(10000);
 }
 
 void test()
@@ -31,7 +31,7 @@ void test()
   {
     if (readyToSend[i])
     {
-      net_manager.sendRequest("GET", "http://172.16.30.166:8080/", "", i, false);
+      net_manager.sendRequest("GET", HOST_NAME, "", i, false);
     }
   }
 }
