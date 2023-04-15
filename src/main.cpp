@@ -20,9 +20,18 @@ void setup()
 }
 void loop()
 {
-  conversation_api.detectMsgID(net_manager, memory_api);
+  // conversation_api.detectMsgID(net_manager, memory_api);
+  test();
+  delay(10000);
 }
 
 void test()
 {
+  for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
+  {
+    if (readyToSend[i])
+    {
+      net_manager.sendRequest("GET", "http://172.16.30.166:8080/", "", i, false);
+    }
+  }
 }

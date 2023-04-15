@@ -79,8 +79,12 @@ void MemoryAPI::setup()
         delay(1000);
     }
     IS_LOG_ENABLED ? Serial.println(F("SD initialization success.")) : 0;
-
-    IS_LOG_ENABLED ? sd.ls("/", LS_R) : 0;
+    if (IS_LOG_ENABLED)
+    {
+        Serial.println(F("--SD LS OUTPUT--"));
+        sd.ls("/", LS_R);
+        Serial.println(F("--END--"));
+    }
     overallStatus = "";
     isContinueReadingInsSerial = false;
     for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)

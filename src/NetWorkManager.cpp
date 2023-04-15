@@ -1,6 +1,9 @@
 #include "NetWorkManager.h"
 #include <AsyncHTTPRequest_Generic.h>
 
+// default is 3s
+#define DEFAULT_RX_TIMEOUT 10
+
 requestCallback requestCB[MAX_NO_CHANNELS + 1] = {requestCB0, requestCB1, requestCB2, requestCB3, requestCB4, requestCB5, requestCB6};
 bool readyToSend[MAX_NO_CHANNELS + 1];
 bool isPrevReqSuccess[MAX_NO_CHANNELS + 1];
@@ -24,7 +27,7 @@ bool NetWorkManager::setup()
     {
         readyToSend[i] = true;
         isPrevReqSuccess[i] = true;
-        request[i].setDebug(false);
+        request[i].setDebug(true);
         request[i].onReadyStateChange(requestCB[i]);
     }
     while (!checkInternetConnectivity())
@@ -71,6 +74,12 @@ String NetWorkManager::fetchExp()
     return makeGetReq(url);
 }
 
+/**
+ * @brief Always Asynchronous
+ *
+ * @param channelNo
+ * @param measurement
+ */
 void NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)
 {
     const char *base = API_Base;
@@ -78,23 +87,39 @@ void NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)
     sendRequest("POST", url.c_str(), measurement, channelNo, false);
 }
 
+/**
+ * @brief if channel = 0 then synchronous req, otherwise asynchronous
+ *
+ * @param status
+ * @param channelNo
+ * @param rowNo
+ */
 void NetWorkManager::setStatus(String status, u_int8_t channelNo, u_int8_t rowNo)
 {
     const char *base = API_Base;
 
     String url = String(base) + "feed-exp-result/set-status?apiKey=" + API_Key + "&testId=" + testId;
+    bool sync = true;
     if (channelNo > 0)
     {
         url += +"&channel=" + channelNo;
+        sync = false;
     }
     if (rowNo > 0)
     {
         url += "&row=" + rowNo;
     }
     url += "&status=" + status;
-    sendRequest("GET", url.c_str(), "", channelNo);
+
+    sendRequest("GET", url.c_str(), "", channelNo, sync);
 }
 
+/**
+ * @brief always asynchronous
+ *
+ * @param channelNo
+ * @param rowNo
+ */
 void NetWorkManager::incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo)
 {
     const char *base = API_Base;
@@ -166,21 +191,21 @@ bool NetWorkManager::resolveResponse(String response)
 void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 {
     (void)optParm;
-
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
-
-        if (thisRequest->responseHTTPcode() == 200)
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
+            responseText_0 = thisRequest->responseText();
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
-                Serial.println(thisRequest->responseText());
+                Serial.print(F("\n*************Response-"));
+                Serial.print(0);
+                Serial.println(F("**************"));
+                Serial.println(responseText_0);
                 Serial.println(F("**************************************"));
             }
             isPrevReqSuccess[0] = true;
-            responseText_0 = thisRequest->responseText();
         }
         else
         {
@@ -188,6 +213,7 @@ void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
             isPrevReqSuccess[0] = false;
             responseText_0 = "";
         }
+        thisRequest->setDebug(false);
         readyToSend[0] = true;
     }
 }
@@ -198,13 +224,15 @@ void requestCB1(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(1);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -215,6 +243,7 @@ void requestCB1(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
             IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
             isPrevReqSuccess[1] = false;
         }
+        thisRequest->setDebug(false);
         readyToSend[1] = true;
     }
 }
@@ -225,13 +254,15 @@ void requestCB2(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(2);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -242,6 +273,7 @@ void requestCB2(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
             IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
             isPrevReqSuccess[2] = false;
         }
+        thisRequest->setDebug(false);
         readyToSend[2] = true;
     }
 }
@@ -252,13 +284,15 @@ void requestCB3(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(3);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -279,13 +313,15 @@ void requestCB4(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(4);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -306,13 +342,15 @@ void requestCB5(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(5);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -333,13 +371,15 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
     if (readyState == readyStateDone)
     {
-        // Serial.println(thisRequest->responseHTTPString());
+        IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
 
-        if (thisRequest->responseHTTPcode() == 200)
+        if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
             if (IS_LOG_ENABLED)
             {
-                Serial.println(F("\n**************************************"));
+                Serial.print(F("\n*************Response-"));
+                Serial.print(6);
+                Serial.println(F("**************"));
                 Serial.println(thisRequest->responseText());
                 Serial.println(F("**************************************"));
             }
@@ -356,7 +396,6 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
 /**
  * @brief send http request asynchronous or synchronously
- * if the reqChannel is =0 then all the request will be synchronous
  * @param method "GET"|"POST"
  * @param url
  * @param body
@@ -365,18 +404,19 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
  */
 void NetWorkManager::sendRequest(const char *method, const char *url, String body, uint8_t reqChannel, bool isSynchronous)
 {
-    bool requestOpenRes = request[reqChannel].open(method, url);
-    isPrevReqSuccess[reqChannel] = false;
-    if (reqChannel == 0)
+    if (!readyToSend[reqChannel])
     {
-        responseText_0 = "";
-        isSynchronous = false;
+        IS_LOG_ENABLED ? Serial.println(F("Network Channel Busy.")) : 0;
     }
+    static bool requestOpenRes;
+    // request[reqChannel].setReqHeader("Content-Type", "application/json");
+    requestOpenRes = request[reqChannel].open(method, url);
+    isPrevReqSuccess[reqChannel] = false;
     if (requestOpenRes)
     {
         if (body.length() > 0)
         {
-            request[reqChannel].setReqHeader("Content-Type", "application/json");
+
             request[reqChannel].send(body.c_str());
         }
         else
@@ -384,16 +424,23 @@ void NetWorkManager::sendRequest(const char *method, const char *url, String bod
             request[reqChannel].send();
         }
         readyToSend[reqChannel] = false;
+        IS_LOG_ENABLED ? Serial.println(F("Req sent.")) : 0;
     }
     else
     {
-        IS_LOG_ENABLED ? Serial.println(F("Req sent failed")) : 0;
+        IS_LOG_ENABLED ? Serial.println(F("Req sent failed!")) : 0;
+        readyToSend[reqChannel] = true;
         return;
     }
     if (isSynchronous)
     {
         // wait until the req get resolved
-        while (!readyToSend[reqChannel])
-            ;
+        while (true)
+        {
+            // i don't know why there has to be delay to be added here to make it work
+            delay(10);
+            if (readyToSend[reqChannel])
+                break;
+        }
     }
 }

@@ -24,6 +24,7 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState);
 
 typedef void (*requestCallback)(void *optParm, AsyncHTTPRequest *thisRequest, int readyState);
 typedef void (*sendCallback)();
+
 #endif
 extern requestCallback requestCB[MAX_NO_CHANNELS + 1];
 extern bool readyToSend[MAX_NO_CHANNELS + 1];
