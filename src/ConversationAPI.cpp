@@ -148,8 +148,8 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
                 Serial.print(F("NO\n"));
                 return;
             }
-            net_man.setStatus("Running");
-            if (net_man.testId != "" && isPrevReqSuccess[0])
+            // net_man.setStatus("Running");&& isPrevReqSuccess[0]
+            if (net_man.testId != "")
             {
                 Serial.print(F("YES\n"));
                 // mem_api.beginInterrupt();
