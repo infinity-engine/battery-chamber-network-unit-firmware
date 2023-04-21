@@ -101,19 +101,21 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
     if (Serial.available())
     {
         String msgId = Serial.readStringUntil('\n');
-        clearIncomingBuffer(); // clear all the input buffer after receiving any command
         blink();
 
         if (msgId == "IS_READY")
         {
+            clearIncomingBuffer(); // clear all the input buffer after receiving any command
             isReady ? Serial.print(F("YES\n")) : Serial.print(F("NO\n"));
         }
         else if (msgId == "IS_EXP")
         {
+            clearIncomingBuffer(); // clear all the input buffer after receiving any command
             checkForEXP(net_man, mem_api);
         }
         else if (msgId == "SEND_TEST")
         {
+            clearIncomingBuffer(); // clear all the input buffer after receiving any command
             sendTestInfo(mem_api, net_man);
         }
         else if (msgId == "START")
@@ -122,46 +124,53 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
             //  START
             //  1,4,2,5
             String ch = "";
+            bool isAnyChannel = false;
             while (Serial.available())
             {
                 char c = Serial.read();
-                if (c != ',' || c != '\n')
+                if (c != ',' && c != '\n')
                 {
                     ch += c;
                 }
                 else
                 {
-                    ch = "";
+                    isAnyChannel = true;
                     if (!initSDForEXP(mem_api, ch.toInt()))
                     {
                         Serial.print(F("NO\n"));
                         return;
                     }
+                    ch = "";
                 }
+            }
+            if (!isAnyChannel)
+            {
+                Serial.print(F("NO\n"));
+                return;
             }
             net_man.setStatus("Running");
             if (net_man.testId != "" && isPrevReqSuccess[0])
             {
                 Serial.print(F("YES\n"));
-                mem_api.beginInterrupt();
+                // mem_api.beginInterrupt();
             }
             else
             {
                 Serial.print(F("NO\n"));
                 return;
             }
+
             mem_api.isContinueReadingInsSerial = true;
             while (mem_api.isContinueReadingInsSerial)
             {
                 mem_api.readAndSendInstruction(net_man);
             }
-
-            // mem_api.continueReadAndSendInstruction = true;
-            // mem_api.readAndSendInstruction(net_man); // infinite cycle until the experiment is complete or stopped
-            // // reset for next instruction
-            mem_api.endInterrupt();
+            mem_api.wrapup(&net_man); // END statement has received and send the final status and wrap up everything
+            // mem_api.endInterrupt();
             mem_api.setup();
             setup();
+            isReady = true;
+            clearIncomingBuffer();
         }
 
         else
@@ -187,14 +196,16 @@ bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo)
         return false;
     }
     String fileName = "";
-    fileName += channelNo + "_instructions.txt";
+    fileName += channelNo;
+    fileName += "_instructions.txt";
     if (mem_api.sd.exists(fileName) && !mem_api.sd.remove(fileName))
     {
         return false;
     }
-    InstructionsHandler irh(channelNo);
-    mem_api.irhArray[channelNo - 1] = &irh;
-    return true;
+    mem_api.file = mem_api.sd.open(fileName, O_WRONLY | O_CREAT); // create new file
+    mem_api.file.close();                                         // save the file
+    mem_api.irhArray[channelNo - 1].setup(channelNo);
+    return mem_api.irhArray[channelNo - 1].isSetUp;
 }
 
 /**
@@ -345,8 +356,8 @@ void ConversationAPI::sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man)
     {
         isDriveCycleForRowSent = false;
         // if it is drive cycle then you have to fetch drive cycle.
-        String driveCycleRow = net_man.getDriveCycle(rowInfoDoc["channelNumber"], onNoOfRowOfCh);
-        mem_api.writeFile(driveCycleRow.c_str(), "driveCycle.csv");
+        char *driveCycleRow = net_man.getDriveCycle(rowInfoDoc["channelNumber"], onNoOfRowOfCh);
+        mem_api.writeFile(driveCycleRow, "driveCycle.csv");
     }
     else
     {
@@ -369,4 +380,53 @@ void ConversationAPI::clearIncomingBuffer()
             Serial.read();
         }
     }
+}
+
+void ConversationAPI::recvWithStartEndMarkers()
+{
+    static boolean recvInProgress = false;
+    static unsigned int ndx = 0;
+    char startMarker = '<';
+    char endMarker = '>';
+    char rc;
+
+    while (Serial.available() > 0 && newData == false)
+    {
+        rc = Serial.read();
+
+        if (recvInProgress == true)
+        {
+            if (rc != endMarker)
+            {
+                receivedChars[ndx] = rc;
+                ndx++;
+                if (ndx >= numChars)
+                {
+                    ndx = numChars - 1;
+                }
+            }
+            else
+            {
+                receivedChars[ndx] = '\0'; // terminate the string
+                recvInProgress = false;
+                ndx = 0;
+                newData = true;
+            }
+        }
+
+        else if (rc == startMarker)
+        {
+            recvInProgress = true;
+        }
+    }
+}
+bool ConversationAPI::fillNewData(char *buffer)
+{
+    if (newData == true)
+    {
+        strcpy(buffer, receivedChars);
+        newData = false;
+        return false;
+    }
+    return false;
 }

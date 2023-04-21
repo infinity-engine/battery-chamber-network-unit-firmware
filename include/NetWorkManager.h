@@ -30,24 +30,23 @@ extern requestCallback requestCB[MAX_NO_CHANNELS + 1];
 extern bool readyToSend[MAX_NO_CHANNELS + 1];
 extern bool isPrevReqSuccess[MAX_NO_CHANNELS + 1];
 extern AsyncHTTPRequest request[MAX_NO_CHANNELS + 1];
-extern String responseText_0;
 
 class NetWorkManager
 {
 public:
     NetWorkManager();
     bool setup();
-    void sendRequest(const char *method, const char *url, String body = "", uint8_t reqChannel = 0, bool isSynchronous = true);
-    String makePostReq(String url, String jsonString);
-    String makeGetReq(String url);
-    bool checkInternetConnectivity();
-    String fetchExp();
-    void sendMeasurement(u_int8_t channelNo, String measurement);
+    void sendRequest(const char *method, const char *url, const char *body = "", uint8_t reqChannel = 0, bool isSynchronous = true);
+    char *makePostReq(String url, const char *body = "");
+    char *makeGetReq(String url);
+    bool checkAPIConnectivity();
+    char *fetchExp();
+    void sendMeasurement(u_int8_t channelNo, const char *);
     void setStatus(String status, u_int8_t channelNo = 0, u_int8_t rowNo = 0);
     bool resolveResponse(String response);
     void incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo = 0);
-    String getDriveCycle(u_int8_t channelNo, u_int8_t rowNo);
-    String updatedUpto(u_int8_t channelNo);
+    char *getDriveCycle(u_int8_t channelNo, u_int8_t rowNo);
+    char *updatedUpto(u_int8_t channelNo);
     String base = API_Base;
     String testId;
 };

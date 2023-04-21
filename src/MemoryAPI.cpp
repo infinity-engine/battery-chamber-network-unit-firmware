@@ -73,12 +73,12 @@ void MemoryAPI::setup()
 {
     while (!sd.begin(SD_CONFIG))
     {
-        IS_LOG_ENABLED ? Serial.println(F("SD initialization failed.")) : 0;
+        IS_LOG_ENABLED ? Serial.println(F("SD init failed.")) : 0;
         delay(1000);
-        IS_LOG_ENABLED ? Serial.println(F("Trying to reinitialize.")) : 0;
+        IS_LOG_ENABLED ? Serial.println(F("Trying to re-init.")) : 0;
         delay(1000);
     }
-    IS_LOG_ENABLED ? Serial.println(F("SD initialization success.")) : 0;
+    IS_LOG_ENABLED ? Serial.println(F("SD init success.")) : 0;
     if (IS_LOG_ENABLED)
     {
         Serial.println(F("--SD LS OUTPUT--"));
@@ -89,7 +89,7 @@ void MemoryAPI::setup()
     isContinueReadingInsSerial = false;
     for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
     {
-        irhArray[i] = NULL;
+        irhArray[i].reset();
     }
 }
 
@@ -362,13 +362,13 @@ int MemoryAPI::bytesAvailable(Stream *stream)
 {
     int bytesAvailable = stream->available();
 
-    if (bytesAvailable >= 60)
+    if (bytesAvailable >= SERIAL_RX_BUFFER_SIZE - 5)
     {
-        IS_LOG_ENABLED ? Serial.println(F("Warning: incoming buffer is almost full!")) : 0;
+        Serial.println(F("Warning: incoming buffer is almost full!"));
     }
-    if (bytesAvailable == 64)
+    if (bytesAvailable == SERIAL_RX_BUFFER_SIZE)
     {
-        IS_LOG_ENABLED ? Serial.println(F("Error: incoming buffer overflow!")) : 0;
+        Serial.println(F("Error: incoming buffer overflow!"));
     }
     return bytesAvailable;
 }
@@ -453,24 +453,65 @@ bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
 
 void MemoryAPI::readAndSendInstruction(NetWorkManager &nwm)
 {
-    readInstructions();
     for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
     {
-        if (irhArray[i] == NULL)
+        readInstructions();
+        if (!irhArray[i].isSetUp)
             continue;
-        irhArray[i]->handleInstruction(&nwm, this);
+        // irhArray[i].handleInstruction(&nwm, this);
         readInstructions();
     }
 }
 
+/**
+ * @brief read whatever instruction for experiment is send after the interrput is triggered and write it to the memory through serial
+ * |<channelNo>
+ * <instructions>
+ * |
+ * |<channelNo>
+ * <instructions>
+ * |
+ * |...
+ *
+ * |END
+ * <status code>
+ * |
+ *
+ */
 void MemoryAPI::readInstructions()
 {
-    if (!isInstructionAvailable)
-        return;
-    while (Serial.available())
+    // if (!isInstructionAvailable)
+    //     return;
+    // Serial.println(millis());
+    while (bytesAvailable(&Serial))
     {
-        while (Serial.read() != '|')
-            ;
+        while (true)
+        {
+            if (bytesAvailable(&Serial))
+            {
+                char c = Serial.read();
+                Serial.print(c);
+                Serial.print("-");
+                Serial.print((int)c);
+                Serial.print("\t");
+                if (c == '<')
+                    break;
+            }
+        }
+        Serial.println();
+        unsigned long t = millis();
+        uint8_t d = 20; // wait for atleast 20ms
+        while (millis() < t + d)
+        {
+            if (Serial.available())
+            {
+                break;
+            }
+        }
+        if (!Serial.available())
+        {
+            return;
+        }
         String msg = Serial.readStringUntil('\n');
         if (msg == "END")
         {
@@ -495,10 +536,32 @@ void MemoryAPI::readInstructions()
         else
         {
             uint8_t channel = msg.toInt();
-            writeInstructions(channel, irhArray[channel - 1]);
+            Serial.print("Ch - ");
+            Serial.println(channel);
+            if (channel)
+            {
+                writeInstructions(&irhArray[channel - 1]); // takes around 12ms
+            }
+            else
+            {
+                Serial.println("missed");
+                Serial.println(msg);
+                // if there is a miss of data receiving then skip this instruction
+                while (true)
+                {
+                    if (bytesAvailable(&Serial))
+                    {
+                        char c = Serial.read();
+                        Serial.print(c);
+                        if (c == '>')
+                            break;
+                    }
+                }
+                Serial.println();
+            }
         }
     }
-    isInstructionAvailable = false;
+    // isInstructionAvailable = false;
 }
 
 void IRAM_ATTR MemoryAPI::raiseFlagForInt()
@@ -506,10 +569,12 @@ void IRAM_ATTR MemoryAPI::raiseFlagForInt()
     isInstructionAvailable = true;
 }
 
-void MemoryAPI::writeInstructions(uint8_t channelNo, InstructionsHandler *irh)
+void MemoryAPI::writeInstructions(InstructionsHandler *irh)
 {
-    if (irh != NULL)
+    if (irh->isSetUp)
         irh->writeUntil(this);
+    else
+        IS_LOG_ENABLED ? Serial.println("Not Set Up") : 0;
 }
 
 void MemoryAPI::wrapup(NetWorkManager *nwm)
@@ -520,13 +585,13 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
         isContinue = false;
         for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
         {
-            if (irhArray[i] != NULL)
+            if (irhArray[i].isSetUp)
             {
-                irhArray[i]->handleInstruction(nwm, this);
-                if (irhArray[i]->isInstructionAvailable)
+                irhArray[i].handleInstruction(nwm, this);
+                if (irhArray[i].isInstructionAvailable)
                     isContinue = true;
                 else
-                    irhArray[i]->wrapUp(this);
+                    ; // irhArray[i].wrapUp(this);
             }
         }
     }

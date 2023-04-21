@@ -2,16 +2,39 @@
 #include "MemoryAPI.h"
 #include "NetWorkManager.h"
 
-InstructionsHandler::InstructionsHandler(uint8_t ch)
+InstructionsHandler::InstructionsHandler()
+{
+    isSetUp = false;
+}
+void InstructionsHandler::setup(uint8_t ch)
 {
     channelNo = ch;
     fileName = "";
-    fileName = channelNo + "_instructions.txt";
+    fileName += channelNo;
+    fileName += "_instructions.txt";
     filePosition = 0;
     prevFilePosition = 0;
-    isInstructionAvailable = true;
+    isInstructionAvailable = false;
+    isSetUp = true;
 }
 
+void InstructionsHandler::reset()
+{
+    channelNo = 0;
+    fileName = "";
+    filePosition = 0;
+    prevFilePosition = 0;
+    isInstructionAvailable = false;
+    isSetUp = false;
+}
+
+/**
+ * @brief Read instruction form the memory card for experiment data and send it to cloud
+ * instruction could be measuremnt, increment ch multiplier, status change
+ *
+ * @param nwm
+ * @param mpi
+ */
 void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
 {
     if (!readyToSend[channelNo])
@@ -35,32 +58,44 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
     else
     {
         mpi->file.seek(prevFilePosition);
+        IS_LOG_ENABLED ? Serial.println(F("Prev. ins sent failed.")) : 0;
     }
     if (mpi->file.available())
     {
-        String ins = mpi->file.readStringUntil('\n');
+        unsigned long t2 = millis();
+        unsigned long t = millis();
+        String ins = mpi->file.readStringUntil('\n'); // instructions; takes 1ms
+        Serial.print("Absolute time ");
+        Serial.println(millis());
         if (ins == "MT")
         {
             // send measurement
             char buffer[Measuremnt_JSON_Buff_Size];
             if (!mpi->readDataFromFileAndConvertToJson(buffer))
             {
-                // skip this measurement
+                // takes atmost 1ms
+                //  skip this measurement
                 return;
             }
-            nwm->sendMeasurement(channelNo, String(buffer));
+            t = millis();
+            nwm->sendMeasurement(channelNo, buffer); // take at most 3ms
+            Serial.print("Send time ");
+            Serial.println(millis() - t);
         }
         else if (ins == "IM")
         {
             // increment multiplier
-            int row = Serial.readStringUntil('\n').toInt();
+            int row = mpi->file.readStringUntil('\n').toInt();
+            unsigned long t = millis();
             nwm->incrementMultiPlierIndex(channelNo, row);
+            Serial.print("Send time ");
+            Serial.println(millis() - t);
         }
         else if (ins == "SS")
         {
-            // increment multiplier
-            int row = Serial.readStringUntil('\n').toInt();
-            uint8_t status = Serial.readStringUntil('\n').toInt();
+            // set status
+            int row = mpi->file.readStringUntil('\n').toInt();
+            uint8_t status = mpi->file.readStringUntil('\n').toInt();
             String statusS = "";
             switch (status)
             {
@@ -76,8 +111,23 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
             default:
                 break;
             }
+            Serial.print("Row ");
+            Serial.println(row);
+            Serial.print("Status ");
+            Serial.print(status);
+            Serial.println(statusS);
+            unsigned long t = millis();
             nwm->setStatus(statusS, channelNo, row);
+            Serial.print("Send time ");
+            Serial.println(millis() - t);
         }
+        else
+        {
+            Serial.println(F("Not Matched"));
+            prevFilePosition = mpi->file.position();
+        }
+        Serial.print(F("Time to sent req "));
+        Serial.println(millis() - t2);
     }
     isInstructionAvailable = mpi->file.available();
     filePosition = mpi->file.position();
@@ -88,18 +138,38 @@ void InstructionsHandler::wrapUp(MemoryAPI *mpi)
 {
     mpi->sd.chdir("/");
     mpi->sd.remove(fileName);
+    reset();
 }
 
-void InstructionsHandler::writeUntil(MemoryAPI *mpi, char terminator)
+void InstructionsHandler::writeUntil(MemoryAPI *mpi, int delay, char terminator)
 {
     if (!mpi->sd.chdir("/"))
         return;
-    mpi->file = mpi->sd.open(fileName, O_WRONLY | O_CREAT);
-    if (!mpi->file)
-        return;
-    String ins = Serial.readStringUntil(terminator);
-    if (ins.length())
-        mpi->file.print(ins);
 
+    // Serial.println(fileName);
+    mpi->file = mpi->sd.open(fileName, O_WRONLY | O_APPEND);
+    if (!mpi->file)
+    {
+        IS_LOG_ENABLED ? Serial.println(F("File Open Failed")) : 0;
+        return;
+    }
+    unsigned long t = millis();
+    while (millis() < t + delay)
+    {
+        while (Serial.available())
+        {
+            char c = Serial.read();
+            if (c == terminator)
+            {
+                mpi->file.close();
+                return;
+            }
+            else
+            {
+                mpi->file.print(c);
+                t = millis();
+            }
+        }
+    }
     mpi->file.close();
 }

@@ -11,7 +11,7 @@ ConversationAPI conversation_api;
 void test();
 void setup()
 {
-  // Serial.setRxBufferSize(SERIAL_RX_BUFFER_SIZE);
+  Serial.setRxBufferSize(SERIAL_RX_BUFFER_SIZE);
   Serial.begin(115200);
   net_manager.setup();
   memory_api.setup();
@@ -27,11 +27,12 @@ void loop()
 
 void test()
 {
-  for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
-  {
-    if (readyToSend[i])
-    {
-      net_manager.sendRequest("GET", HOST_NAME, "", i, false);
-    }
-  }
+  // for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
+  // {
+  //   if (readyToSend[i])
+  //   {
+  //     net_manager.sendRequest("GET", HOST_NAME, "", i, false);
+  //   }
+  // }
+  net_manager.sendRequest("GET", HOST_NAME, "", 1, false);
 }

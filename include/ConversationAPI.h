@@ -7,6 +7,8 @@ class NetWorkManager;
 class MemoryAPI;
 #include "InstructionsHandler.h"
 
+const unsigned int numChars = 300;
+
 class ConversationAPI
 {
 public:
@@ -32,5 +34,9 @@ public:
     StaticJsonDocument<400> configDoc;
     bool isRowInfoSent;
     bool isDriveCycleForRowSent;
+    char receivedChars[numChars];
+    boolean newData = false;
+    void recvWithStartEndMarkers();
+    bool fillNewData(char *buffer);
 };
 #endif

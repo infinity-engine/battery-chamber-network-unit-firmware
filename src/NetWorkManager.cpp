@@ -8,13 +8,13 @@ requestCallback requestCB[MAX_NO_CHANNELS + 1] = {requestCB0, requestCB1, reques
 bool readyToSend[MAX_NO_CHANNELS + 1];
 bool isPrevReqSuccess[MAX_NO_CHANNELS + 1];
 AsyncHTTPRequest request[MAX_NO_CHANNELS + 1];
-String responseText_0;
-
+char emptyStr[] = "";
+char *responseText_0;
 NetWorkManager::NetWorkManager() {}
 
 bool NetWorkManager::setup()
 {
-    responseText_0 = "";
+    responseText_0 = emptyStr;
     WiFi.mode(WIFI_STA);
     WiFi.begin(WiFi_SSID, WiFi_PWD);
     while (WiFi.status() != WL_CONNECTED)
@@ -29,32 +29,32 @@ bool NetWorkManager::setup()
         request[i] = myReq;
         readyToSend[i] = true;
         isPrevReqSuccess[i] = true;
-        request[i].setDebug(true);
+        request[i].setDebug(false);
         request[i].onReadyStateChange(requestCB[i]);
     }
-    while (!checkInternetConnectivity())
+    while (!checkAPIConnectivity())
     {
-        IS_LOG_ENABLED ? Serial.println(F("WiFi doesn't have internet access.")) : 0;
+        IS_LOG_ENABLED ? Serial.println(F("Could not connect to API.")) : 0;
         delay(1000);
     }
-    IS_LOG_ENABLED ? Serial.println(F("WiFi has internet connectivity.")) : 0;
+    IS_LOG_ENABLED ? Serial.println(F("Connection to API is successful.")) : 0;
     testId = "";
     return true;
 }
 
 // on channel 0
-String NetWorkManager::makePostReq(String url, String jsonString)
+char *NetWorkManager::makePostReq(String url, const char *body)
 {
     // on average taking around 500ms-1s max
     if (WiFi.status() == WL_CONNECTED)
     {
-        sendRequest("POST", url.c_str(), jsonString);
+        sendRequest("POST", url.c_str(), body);
     }
     return responseText_0;
 }
 
 // on channel 0
-String NetWorkManager::makeGetReq(String url)
+char *NetWorkManager::makeGetReq(String url)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
@@ -69,7 +69,7 @@ String NetWorkManager::makeGetReq(String url)
  * the experiment which has earliest date
  * @return EXP_CONFIG|"null"
  */
-String NetWorkManager::fetchExp()
+char *NetWorkManager::fetchExp()
 {
     const char *base = API_Base;
     String url = String(base) + "is-any-experiment?apiKey=" + API_Key;
@@ -82,7 +82,7 @@ String NetWorkManager::fetchExp()
  * @param channelNo
  * @param measurement
  */
-void NetWorkManager::sendMeasurement(u_int8_t channelNo, String measurement)
+void NetWorkManager::sendMeasurement(u_int8_t channelNo, const char *measurement)
 {
     const char *base = API_Base;
     String url = String(base) + "feed-exp-result/insert-measurement?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo;
@@ -104,15 +104,17 @@ void NetWorkManager::setStatus(String status, u_int8_t channelNo, u_int8_t rowNo
     bool sync = true;
     if (channelNo > 0)
     {
-        url += +"&channel=" + channelNo;
+        url += "&channel=";
+        url += channelNo;
         sync = false;
     }
     if (rowNo > 0)
     {
-        url += "&row=" + rowNo;
+        url += "&row=";
+        url += rowNo;
     }
-    url += "&status=" + status;
-
+    url += "&status=";
+    url += status;
     sendRequest("GET", url.c_str(), "", channelNo, sync);
 }
 
@@ -128,26 +130,29 @@ void NetWorkManager::incrementMultiPlierIndex(u_int8_t channelNo, u_int8_t rowNo
     String url = String(base) + "feed-exp-result/increment-multiplier-index?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo;
     if (rowNo > 0)
     {
-        url += "&row=" + rowNo;
+        url += "&row=";
+        url += rowNo;
     }
+    Serial.print("url ");
+    Serial.println(url);
     sendRequest("GET", url.c_str(), "", channelNo, false);
 }
 
-String NetWorkManager::getDriveCycle(u_int8_t channelNo, u_int8_t rowNo)
+char *NetWorkManager::getDriveCycle(u_int8_t channelNo, u_int8_t rowNo)
 {
     const char *base = API_Base;
     String url = String(base) + "get-drive-cycle?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo + "&row=" + rowNo;
     return makeGetReq(url);
 }
 
-String NetWorkManager::updatedUpto(u_int8_t channelNo)
+char *NetWorkManager::updatedUpto(u_int8_t channelNo)
 {
     const char *base = API_Base;
     String url = String(base) + "feed-exp-result/updated-upto?apiKey=" + API_Key + "&testId=" + testId + "&channel=" + channelNo;
     return makeGetReq(url);
 }
 
-bool NetWorkManager::checkInternetConnectivity()
+bool NetWorkManager::checkAPIConnectivity()
 {
 
     if (WiFi.status() == WL_CONNECTED)
@@ -197,10 +202,13 @@ void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
         IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
         if (thisRequest->responseHTTPcode() == 200 || thisRequest->responseHTTPcode() == 204)
         {
-            responseText_0 = thisRequest->responseText();
+            // MODIFY The LIBRARY for
+            // responseLongText() line #1062 to
+            // globalLongString[lenToCopy] = 0;
+            responseText_0 = thisRequest->responseLongText(); // using this takes 16KB of global memory
             if (IS_LOG_ENABLED)
             {
-                Serial.print(F("\n*************Response-"));
+                Serial.print(F("\n*************Response****************"));
                 Serial.print(0);
                 Serial.println(F("**************"));
                 Serial.println(responseText_0);
@@ -212,7 +220,7 @@ void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
         {
             IS_LOG_ENABLED ? Serial.println(F("Response error")) : 0;
             isPrevReqSuccess[0] = false;
-            responseText_0 = "";
+            responseText_0 = emptyStr;
         }
         thisRequest->setDebug(false);
         readyToSend[0] = true;
@@ -221,8 +229,8 @@ void requestCB0(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 
 void requestCB1(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
 {
+    // takes almost none time
     (void)optParm;
-
     if (readyState == readyStateDone)
     {
         IS_LOG_ENABLED ? Serial.println(thisRequest->responseHTTPcode()) : 0;
@@ -246,6 +254,8 @@ void requestCB1(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
         }
         thisRequest->setDebug(false);
         readyToSend[1] = true;
+        Serial.print("CB Absolute time ");
+        Serial.println(millis());
     }
 }
 
@@ -403,22 +413,23 @@ void requestCB6(void *optParm, AsyncHTTPRequest *thisRequest, int readyState)
  * @param reqChannel
  * @param isSynchronous
  */
-void NetWorkManager::sendRequest(const char *method, const char *url, String body, uint8_t reqChannel, bool isSynchronous)
+void NetWorkManager::sendRequest(const char *method, const char *url, const char *body, uint8_t reqChannel, bool isSynchronous)
 {
     isPrevReqSuccess[reqChannel] = false;
     if (!readyToSend[reqChannel])
     {
         IS_LOG_ENABLED ? Serial.println(F("Network Channel Busy.")) : 0;
+        return;
     }
-    static bool requestOpenRes;
-    request[reqChannel].setReqHeader("Content-Type", "application/json");
+    bool requestOpenRes;
     requestOpenRes = request[reqChannel].open(method, url);
-    isPrevReqSuccess[reqChannel] = false;
     if (requestOpenRes)
     {
-        if (body.length() > 0)
+        if (strlen(body) > 0)
         {
-            request[reqChannel].send(body.c_str());
+            // Serial.println(body);
+            request[reqChannel].setReqHeader("Content-Type", "application/json");
+            request[reqChannel].send(body);
         }
         else
         {

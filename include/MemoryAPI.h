@@ -26,7 +26,7 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #define LINE_LEN 100
 static ArduinoOutStream cout(Serial);
 class NetWorkManager;
-class InstructionsHandler;
+#include <InstructionsHandler.h>
 #define Measuremnt_JSON_Buff_Size 300
 
 class MemoryAPI
@@ -50,7 +50,7 @@ public:
     void endInterrupt();
     String overallStatus;
     bool isContinueReadingInsSerial;
-    void writeInstructions(uint8_t channelNo, InstructionsHandler *inh);
+    void writeInstructions(InstructionsHandler *inh);
     void readInstructions();
     void wrapup(NetWorkManager *nwm);
     static void IRAM_ATTR raiseFlagForInt();
@@ -65,8 +65,7 @@ public:
     uint32_t ocr;
     uint32_t cardSize; // in MB
     uint32_t freeSize; // in MB
-
-    InstructionsHandler *irhArray[MAX_NO_CHANNELS];
+    InstructionsHandler irhArray[MAX_NO_CHANNELS];
 };
 
 #endif
