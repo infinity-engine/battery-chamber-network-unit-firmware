@@ -66,6 +66,7 @@ public:
     uint32_t cardSize; // in MB
     uint32_t freeSize; // in MB
     InstructionsHandler irhArray[MAX_NO_CHANNELS];
+    void clearIncomingBuffer();
 };
 
 #endif

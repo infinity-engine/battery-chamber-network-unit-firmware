@@ -2,6 +2,7 @@
 #define PROTOTYPE
 
 #define IS_LOG_ENABLED false
+extern bool IS_LIVE_UPDATE_ENABLE;
 #define SERIAL_RX_BUFFER_SIZE 256
 #include <Arduino.h>
 void blink(int delay_ = 100);

@@ -1,7 +1,7 @@
 #include "MemoryAPI.h"
 #include "NetWorkManager.h"
 #include "InstructionsHandler.h"
-
+bool IS_LIVE_UPDATE_ENABLE = false;
 char line[40];
 
 //------------------------------------------------------------------------------
@@ -417,16 +417,28 @@ bool MemoryAPI::readDataFromFileAndConvertToJson(char *buffer)
         {
             return false;
         }
-
+        char zero[] = "";
         char *time = strtok(line, ",");        // Time
         char *voltageStr = strtok(NULL, ",");  // Voltage as string
         char *currentStr = strtok(NULL, ",");  // Current as string
         char *chamTempStr = strtok(NULL, ","); // Chamber temperature as string
-        char *chamHumStr = strtok(NULL, ",");  // Chamber humidity as string
-        char *cellTempStr[CELL_TEMP_COUNT];    // Array to store cell temperatures as strings
-        int cellTempCount = 0;                 // Number of cell temperatures found in the line
+        if (strcmp("NAN", chamTempStr) == 0)
+        {
+            chamTempStr = zero;
+        }
+        char *chamHumStr = strtok(NULL, ","); // Chamber humidity as string
+        if (strcmp("NAN", chamHumStr) == 0)
+        {
+            chamHumStr = zero;
+        }
+        char *cellTempStr[CELL_TEMP_COUNT]; // Array to store cell temperatures as strings
+        int cellTempCount = 0;              // Number of cell temperatures found in the line
         for (char *cellTemp = strtok(NULL, ","); cellTemp != NULL; cellTemp = strtok(NULL, ","))
         {
+            if (strcmp("NAN", cellTemp) == 0)
+            {
+                cellTemp = zero;
+            }
             cellTempStr[cellTempCount++] = cellTemp;
         }
 
@@ -458,7 +470,8 @@ void MemoryAPI::readAndSendInstruction(NetWorkManager &nwm)
         readInstructions();
         if (!irhArray[i].isSetUp)
             continue;
-        // irhArray[i].handleInstruction(&nwm, this);
+        if (IS_LIVE_UPDATE_ENABLE)
+            irhArray[i].handleInstruction(&nwm, this); // uncomment it to start live update
         readInstructions();
     }
 }
@@ -485,22 +498,24 @@ void MemoryAPI::readInstructions()
     // Serial.println(millis());
     while (bytesAvailable(&Serial))
     {
+        bool flag = true;
         while (true)
         {
             if (bytesAvailable(&Serial))
             {
                 char c = Serial.read();
-                Serial.print(c);
-                Serial.print("-");
-                Serial.print((int)c);
-                Serial.print("\t");
                 if (c == '<')
                     break;
+                else if (flag)
+                {
+                    Serial.print(F(" miss "));
+                    flag = false;
+                }
             }
         }
-        Serial.println();
+        // wait for atleast 20ms
         unsigned long t = millis();
-        uint8_t d = 20; // wait for atleast 20ms
+        uint8_t d = 20;
         while (millis() < t + d)
         {
             if (Serial.available())
@@ -532,36 +547,22 @@ void MemoryAPI::readInstructions()
                 break;
             }
             isContinueReadingInsSerial = false;
+            Serial.print(F("Rec. End with status code "));
+            Serial.println(status);
+            clearIncomingBuffer();
+            return;
         }
         else
         {
             uint8_t channel = msg.toInt();
-            Serial.print("Ch - ");
-            Serial.println(channel);
             if (channel)
             {
+                Serial.print("Ch ");
+                Serial.println(channel);
                 writeInstructions(&irhArray[channel - 1]); // takes around 12ms
-            }
-            else
-            {
-                Serial.println("missed");
-                Serial.println(msg);
-                // if there is a miss of data receiving then skip this instruction
-                while (true)
-                {
-                    if (bytesAvailable(&Serial))
-                    {
-                        char c = Serial.read();
-                        Serial.print(c);
-                        if (c == '>')
-                            break;
-                    }
-                }
-                Serial.println();
             }
         }
     }
-    // isInstructionAvailable = false;
 }
 
 void IRAM_ATTR MemoryAPI::raiseFlagForInt()
@@ -579,6 +580,18 @@ void MemoryAPI::writeInstructions(InstructionsHandler *irh)
 
 void MemoryAPI::wrapup(NetWorkManager *nwm)
 {
+    if (!IS_LIVE_UPDATE_ENABLE)
+    {
+        // now start sending data
+        while (true)
+        {
+            nwm->setStatus("Running");
+            if (isPrevReqSuccess[0])
+            {
+                break;
+            }
+        }
+    }
     bool isContinue = true;
     while (isContinue)
     {
@@ -594,6 +607,7 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
                     ; // irhArray[i].wrapUp(this);
             }
         }
+        delay(1);
     }
     nwm->setStatus(overallStatus);
 }
@@ -607,6 +621,19 @@ void MemoryAPI::beginInterrupt()
 void MemoryAPI::endInterrupt()
 {
     detachInterrupt(digitalPinToInterrupt(ESP_INT_PIN));
+}
+
+void MemoryAPI::clearIncomingBuffer()
+{
+    int d = 50; // wait for 50ms atleast
+    unsigned long t = millis();
+    while (millis() < t + d)
+    {
+        while (Serial.available())
+        {
+            Serial.read();
+        }
+    }
 }
 
 bool MemoryAPI::isInstructionAvailable;

@@ -37,6 +37,7 @@ void InstructionsHandler::reset()
  */
 void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
 {
+    // takes on an average 30ms that doesn't mean this is the time to complete the req.
     if (!readyToSend[channelNo])
     {
         return;
@@ -54,6 +55,15 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
     {
         prevFilePosition = filePosition;
         mpi->file.seek(filePosition);
+        if (mpi->file.available())
+        {
+            isInstructionAvailable = true;
+        }
+        else
+        {
+            isInstructionAvailable = false;
+            return;
+        }
     }
     else
     {
@@ -62,11 +72,9 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
     }
     if (mpi->file.available())
     {
-        unsigned long t2 = millis();
-        unsigned long t = millis();
+        // Serial.print(F("CH- "));
+        // Serial.println(channelNo);
         String ins = mpi->file.readStringUntil('\n'); // instructions; takes 1ms
-        Serial.print("Absolute time ");
-        Serial.println(millis());
         if (ins == "MT")
         {
             // send measurement
@@ -75,21 +83,16 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
             {
                 // takes atmost 1ms
                 //  skip this measurement
+                mpi->file.close();
                 return;
             }
-            t = millis();
             nwm->sendMeasurement(channelNo, buffer); // take at most 3ms
-            Serial.print("Send time ");
-            Serial.println(millis() - t);
         }
         else if (ins == "IM")
         {
             // increment multiplier
             int row = mpi->file.readStringUntil('\n').toInt();
-            unsigned long t = millis();
             nwm->incrementMultiPlierIndex(channelNo, row);
-            Serial.print("Send time ");
-            Serial.println(millis() - t);
         }
         else if (ins == "SS")
         {
@@ -111,25 +114,14 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
             default:
                 break;
             }
-            Serial.print("Row ");
-            Serial.println(row);
-            Serial.print("Status ");
-            Serial.print(status);
-            Serial.println(statusS);
-            unsigned long t = millis();
             nwm->setStatus(statusS, channelNo, row);
-            Serial.print("Send time ");
-            Serial.println(millis() - t);
         }
         else
         {
             Serial.println(F("Not Matched"));
             prevFilePosition = mpi->file.position();
         }
-        Serial.print(F("Time to sent req "));
-        Serial.println(millis() - t2);
     }
-    isInstructionAvailable = mpi->file.available();
     filePosition = mpi->file.position();
     mpi->file.close();
 }

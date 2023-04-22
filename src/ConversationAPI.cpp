@@ -26,6 +26,7 @@ void ConversationAPI::setup()
     filePostion = 0;
     isRowInfoSent = false;
     isDriveCycleForRowSent = true;
+    clearIncomingBuffer();
 }
 
 /**
@@ -120,57 +121,7 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
         }
         else if (msgId == "START")
         {
-            // initiate sd card for output measurement
-            //  START
-            //  1,4,2,5
-            String ch = "";
-            bool isAnyChannel = false;
-            while (Serial.available())
-            {
-                char c = Serial.read();
-                if (c != ',' && c != '\n')
-                {
-                    ch += c;
-                }
-                else
-                {
-                    isAnyChannel = true;
-                    if (!initSDForEXP(mem_api, ch.toInt()))
-                    {
-                        Serial.print(F("NO\n"));
-                        return;
-                    }
-                    ch = "";
-                }
-            }
-            if (!isAnyChannel)
-            {
-                Serial.print(F("NO\n"));
-                return;
-            }
-            // net_man.setStatus("Running");&& isPrevReqSuccess[0]
-            if (net_man.testId != "")
-            {
-                Serial.print(F("YES\n"));
-                // mem_api.beginInterrupt();
-            }
-            else
-            {
-                Serial.print(F("NO\n"));
-                return;
-            }
-
-            mem_api.isContinueReadingInsSerial = true;
-            while (mem_api.isContinueReadingInsSerial)
-            {
-                mem_api.readAndSendInstruction(net_man);
-            }
-            mem_api.wrapup(&net_man); // END statement has received and send the final status and wrap up everything
-            // mem_api.endInterrupt();
-            mem_api.setup();
-            setup();
-            isReady = true;
-            clearIncomingBuffer();
+            startExperiment(net_man, mem_api);
         }
 
         else
@@ -189,7 +140,7 @@ void ConversationAPI::detectMsgID(NetWorkManager &net_man, MemoryAPI &mem_api)
  * @return true
  * @return false
  */
-bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo)
+bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo, bool isNewFile)
 {
     if (!mem_api.sd.chdir("/"))
     {
@@ -198,12 +149,15 @@ bool ConversationAPI::initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo)
     String fileName = "";
     fileName += channelNo;
     fileName += "_instructions.txt";
-    if (mem_api.sd.exists(fileName) && !mem_api.sd.remove(fileName))
+    if (isNewFile)
     {
-        return false;
+        if (mem_api.sd.exists(fileName) && !mem_api.sd.remove(fileName))
+        {
+            return false;
+        }
+        mem_api.file = mem_api.sd.open(fileName, O_WRONLY | O_CREAT); // create new file
+        mem_api.file.close();                                         // save the file
     }
-    mem_api.file = mem_api.sd.open(fileName, O_WRONLY | O_CREAT); // create new file
-    mem_api.file.close();                                         // save the file
     mem_api.irhArray[channelNo - 1].setup(channelNo);
     return mem_api.irhArray[channelNo - 1].isSetUp;
 }
@@ -420,6 +374,86 @@ void ConversationAPI::recvWithStartEndMarkers()
         }
     }
 }
+
+void ConversationAPI::startExperiment(NetWorkManager &net_man, MemoryAPI &mem_api)
+{
+    // initiate sd card for output measurement
+    //  START
+    //  1,4,2,5
+    // set live update if the no of channels = 1 other wise not
+    String ch = "";
+    uint8_t isAnyChannel = 0;
+    while (Serial.available())
+    {
+        char c = Serial.read();
+        if (c != ',' && c != '\n')
+        {
+            ch += c;
+        }
+        else
+        {
+            if (!initSDForEXP(mem_api, ch.toInt()))
+            {
+                Serial.print(F("NO\n"));
+                return;
+            }
+            else
+            {
+                isAnyChannel++;
+            }
+            ch = "";
+        }
+    }
+    if (!isAnyChannel)
+    {
+        Serial.print(F("NO\n"));
+        return;
+    }
+    if (isAnyChannel == 1)
+    {
+        IS_LIVE_UPDATE_ENABLE = true;
+    }
+
+    if (IS_LIVE_UPDATE_ENABLE)
+    {
+        // set status only for live updates is enabled
+        net_man.setStatus(F("Running"));
+    }
+
+    if (net_man.testId != "" && isPrevReqSuccess[0])
+    {
+        Serial.print(F("YES\n"));
+    }
+    else
+    {
+        Serial.print(F("NO\n"));
+        return;
+    }
+
+    mem_api.isContinueReadingInsSerial = true;
+    while (mem_api.isContinueReadingInsSerial)
+    {
+        mem_api.readAndSendInstruction(net_man);
+    }
+    Serial.println(F("End of Rec."));
+    mem_api.wrapup(&net_man); // END statement has received and send the final status and wrap up everything
+
+    delay(1000);
+    Serial.print(F("<SEND_OK>"));
+
+    delay(1000);
+    Serial.print(F("Resetting"));
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        delay(1000);
+        Serial.print('.');
+    }
+    Serial.println();
+    mem_api.setup();
+    setup();
+    isReady = true;
+}
+
 bool ConversationAPI::fillNewData(char *buffer)
 {
     if (newData == true)

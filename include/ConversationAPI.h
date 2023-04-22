@@ -21,7 +21,7 @@ public:
     void setup();
     void sendTestInfo(MemoryAPI &mem_api, NetWorkManager &net_man);
     void checkForEXP(NetWorkManager &net_man, MemoryAPI &mem_api);
-    bool initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo);
+    bool initSDForEXP(MemoryAPI &mem_api, uint8_t channelNo, bool isNewFile = true);
     uint8_t onNoOfChannel; // tells on which channel curently data are to be sent
     uint8_t onNoOfRowOfCh; // tells about on which rows info has to be been sent to for the current channel
     uint8_t noOfChannels;  // total no of chennels available
@@ -38,5 +38,6 @@ public:
     boolean newData = false;
     void recvWithStartEndMarkers();
     bool fillNewData(char *buffer);
+    void startExperiment(NetWorkManager &net_man, MemoryAPI &mem_api);
 };
 #endif
