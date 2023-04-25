@@ -17,7 +17,7 @@ void setup()
   memory_api.setup();
   conversation_api.isReady = true;
   blink(2000);
-  //test();
+  // test();
 }
 void loop()
 {
@@ -26,17 +26,17 @@ void loop()
 
 void test()
 {
-  //adding some delay between multiple request is important it reserves time for the reques interrupts to hit
-  // otherwise your code will break for AsyncLibrary
-  //atleast add delay(1)
-  // for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
-  // {
-  //   if (readyToSend[i])
-  //   {
-  //     net_manager.sendRequest("GET", HOST_NAME, "", i, false);
-  //   }
-  // }
-  // net_manager.sendRequest("GET", HOST_NAME, "", 1, false);
+  // adding some delay between multiple request is important it reserves time for the reques interrupts to hit
+  //  otherwise your code will break for AsyncLibrary
+  // atleast add delay(1)
+  //  for (uint8_t i = 0; i <= MAX_NO_CHANNELS; i++)
+  //  {
+  //    if (readyToSend[i])
+  //    {
+  //      net_manager.sendRequest("GET", HOST_NAME, "", i, false);
+  //    }
+  //  }
+  //  net_manager.sendRequest("GET", HOST_NAME, "", 1, false);
   for (uint8_t i = 0; i < MAX_NO_CHANNELS; i++)
   {
     if (!conversation_api.initSDForEXP(memory_api, i + 1, false))
@@ -45,6 +45,6 @@ void test()
       return;
     }
   }
-  net_manager.testId = "64426047c492337a7c8d119a";
+  net_manager.testId = "6446878a99724f686f717d71";
   memory_api.wrapup(&net_manager);
 }

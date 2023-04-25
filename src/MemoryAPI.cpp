@@ -508,7 +508,10 @@ void MemoryAPI::readInstructions()
                     break;
                 else if (flag)
                 {
-                    Serial.print(F(" miss "));
+                    Serial.print(F("miss "));
+                    Serial.print(c);
+                    Serial.print("->");
+                    Serial.println((int)c);
                     flag = false;
                 }
             }
@@ -590,6 +593,7 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
             {
                 break;
             }
+            delay(1000);
         }
     }
     bool isContinue = true;
@@ -607,7 +611,7 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
                     ; // irhArray[i].wrapUp(this);
             }
         }
-        delay(1);
+        delay(5); // very very important step
     }
     nwm->setStatus(overallStatus);
 }

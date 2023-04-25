@@ -27,6 +27,7 @@ void ConversationAPI::setup()
     isRowInfoSent = false;
     isDriveCycleForRowSent = true;
     clearIncomingBuffer();
+    IS_LIVE_UPDATE_ENABLE = false;
 }
 
 /**
@@ -412,6 +413,10 @@ void ConversationAPI::startExperiment(NetWorkManager &net_man, MemoryAPI &mem_ap
     if (isAnyChannel == 1)
     {
         IS_LIVE_UPDATE_ENABLE = true;
+    }
+    else
+    {
+        IS_LIVE_UPDATE_ENABLE = false;
     }
 
     if (IS_LIVE_UPDATE_ENABLE)

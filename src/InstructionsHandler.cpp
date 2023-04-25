@@ -68,7 +68,7 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
     else
     {
         mpi->file.seek(prevFilePosition);
-        IS_LOG_ENABLED ? Serial.println(F("Prev. ins sent failed.")) : 0;
+        Serial.println(F("Prev. ins sent failed."));
     }
     if (mpi->file.available())
     {
@@ -118,7 +118,10 @@ void InstructionsHandler::handleInstruction(NetWorkManager *nwm, MemoryAPI *mpi)
         }
         else
         {
-            Serial.println(F("Not Matched"));
+            Serial.print(channelNo);
+            Serial.print(F(":Code "));
+            Serial.print(ins);
+            Serial.println(F(" Not Matched"));
             prevFilePosition = mpi->file.position();
         }
     }

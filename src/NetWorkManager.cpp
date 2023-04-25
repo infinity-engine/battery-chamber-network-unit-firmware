@@ -417,6 +417,12 @@ void NetWorkManager::sendRequest(const char *method, const char *url, const char
         IS_LOG_ENABLED ? Serial.println(F("Network Channel Busy.")) : 0;
         return;
     }
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println(F("Wifi Disconnected"));
+        return;
+    }
+
     bool requestOpenRes = false;
     requestOpenRes = request[reqChannel].open(method, url);
     if (requestOpenRes)
