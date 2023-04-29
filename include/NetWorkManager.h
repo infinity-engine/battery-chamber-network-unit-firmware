@@ -33,11 +33,7 @@ extern AsyncHTTPRequest request[MAX_NO_CHANNELS + 1];
 
 #define ASYNC_HTTP_DEBUG_PORT Serial
 
-#if IS_LOG_ENABLED
-#define _ASYNC_HTTP_LOGLEVEL_ 4
-#else
 #define _ASYNC_HTTP_LOGLEVEL_ 0
-#endif
 
 class NetWorkManager
 {

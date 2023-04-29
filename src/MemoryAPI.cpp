@@ -595,6 +595,7 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
             }
             delay(1000);
         }
+        // IS_LOG_ENABLED = true;
     }
     bool isContinue = true;
     while (isContinue)
@@ -611,7 +612,7 @@ void MemoryAPI::wrapup(NetWorkManager *nwm)
                     ; // irhArray[i].wrapUp(this);
             }
         }
-        delay(5); // very very important step
+        delay(20); // very very important step
     }
     nwm->setStatus(overallStatus);
 }

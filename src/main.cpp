@@ -7,6 +7,7 @@
 NetWorkManager net_manager;
 MemoryAPI memory_api;
 ConversationAPI conversation_api;
+bool IS_LOG_ENABLED = false;
 
 void test();
 void setup()
@@ -45,6 +46,6 @@ void test()
       return;
     }
   }
-  net_manager.testId = "6446878a99724f686f717d71";
+  net_manager.testId = "644a4558c5bfc394a93d542d";
   memory_api.wrapup(&net_manager);
 }

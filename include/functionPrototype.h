@@ -1,7 +1,7 @@
 #ifndef PROTOTYPE
 #define PROTOTYPE
 
-#define IS_LOG_ENABLED false
+extern bool IS_LOG_ENABLED;
 extern bool IS_LIVE_UPDATE_ENABLE;
 #define SERIAL_RX_BUFFER_SIZE 256
 #include <Arduino.h>
