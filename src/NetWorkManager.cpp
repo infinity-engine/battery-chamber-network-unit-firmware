@@ -424,6 +424,8 @@ void NetWorkManager::sendRequest(const char *method, const char *url, const char
     }
 
     bool requestOpenRes = false;
+    IS_LOG_ENABLED ? Serial.println(url) : 0;
+
     requestOpenRes = request[reqChannel].open(method, url);
     if (requestOpenRes)
     {
