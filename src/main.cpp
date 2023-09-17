@@ -12,10 +12,16 @@ bool IS_LOG_ENABLED = false;
 void test();
 void setup()
 {
+  pinMode(D1, OUTPUT);
+  digitalWrite(D1, LOW);
+  blink(1000);
+  interruptArduino(); // if ever inbetwwen sending the data esp crashes this trigger will help
+  // arduino determine this situation
   Serial.setRxBufferSize(SERIAL_RX_BUFFER_SIZE);
   Serial.begin(115200);
   net_manager.setup();
-  memory_api.setup();
+  blink(300);
+  // memory_api.setup();
   conversation_api.isReady = true;
   blink(2000);
   // test();
@@ -48,4 +54,16 @@ void test()
   }
   net_manager.testId = "644a4558c5bfc394a93d542d";
   memory_api.wrapup(&net_manager);
+}
+
+void espSoftReset()
+{
+  ESP.reset();
+}
+
+void interruptArduino()
+{
+  digitalWrite(D1, HIGH);
+  delay(100);
+  digitalWrite(D1, LOW);
 }

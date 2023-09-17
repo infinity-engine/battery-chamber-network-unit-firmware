@@ -20,4 +20,7 @@ void blink(int delay_ = 100);
 #define ESP_INT_PIN 2
 #define ATMEGA_INT_PIN 1
 
+void espSoftReset();
+void interruptArduino();
+
 #endif

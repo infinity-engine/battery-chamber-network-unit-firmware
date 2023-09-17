@@ -13,5 +13,6 @@
     "string_view": "cpp",
     "initializer_list": "cpp",
     "ranges": "cpp"
-  }
+  },
+  "cmake.sourceDirectory": "C:/Users/EML/Desktop/Test Chamber/battery_test_chamber_network_module/.pio/libdeps/nodemcuv2/ArduinoJson"
 }

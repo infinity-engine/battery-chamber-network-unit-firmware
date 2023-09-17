@@ -6,8 +6,8 @@
 #include "ArduinoJson.h"
 #include "functionPrototype.h"
 
-#ifndef ESP
-#define ESP
+#ifndef ESP_
+#define ESP_
 #include <ESP8266WiFi.h>
 #include <AsyncHTTPRequest_Generic.hpp>
 #endif
