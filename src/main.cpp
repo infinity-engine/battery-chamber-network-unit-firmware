@@ -21,7 +21,7 @@ void setup()
   Serial.begin(115200);
   net_manager.setup();
   blink(300);
-  // memory_api.setup();
+  memory_api.setup();
   conversation_api.isReady = true;
   blink(2000);
   // test();
